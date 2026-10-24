@@ -54,6 +54,8 @@ public final class Kinds {
         return k
     }
 
+    public var folderKindIndex: Int { Int(folderKind) }
+
     public func isPackage(_ e: Entry) -> Bool {
         e.isDirectory && packageKind[Int(e.ext)] >= 0
     }

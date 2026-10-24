@@ -27,7 +27,7 @@ if let i = args.firstIndex(of: "--fili"), i + 1 < args.count { threads = Int(arg
 switch args[1] {
 case "scan":
     let start = ContinuousClock.now
-    let scanner = Scanner(threads: threads)
+    let scanner = DiskScanner(threads: threads)
     guard let tree = scanner.scan(path) else {
         print("non riesco a leggere \(path)")
         exit(1)
@@ -57,7 +57,7 @@ case "mappa":
     let size = (args.count >= 5 ? args[4] : "2400x1500").split(separator: "x").compactMap { Int($0) }
     let (w, h) = (size[0], size[1])
     var start = ContinuousClock.now
-    guard let tree = Scanner(threads: threads).scan(path) else { exit(1) }
+    guard let tree = DiskScanner(threads: threads).scan(path) else { exit(1) }
     print("scansione  \(seconds(start))")
     start = ContinuousClock.now
     let kinds = Kinds(extensions: tree.extensions.names)

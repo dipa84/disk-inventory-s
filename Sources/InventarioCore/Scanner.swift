@@ -9,7 +9,7 @@ import Synchronization
 /// Quando una cartella e tutte le sue sottocartelle sono lette, chi finisce l'ultima la chiude:
 /// somma le dimensioni, ordina le voci e avvisa la cartella sopra. Così anche le somme e gli
 /// ordinamenti vanno in parallelo, e la radice finisce per ultima.
-public final class Scanner: @unchecked Sendable {
+public final class DiskScanner: @unchecked Sendable {
     public let files = Atomic<Int>(0)
     public let folders = Atomic<Int>(0)
     public let bytes = Atomic<UInt64>(0)

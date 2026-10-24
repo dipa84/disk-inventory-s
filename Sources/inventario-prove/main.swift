@@ -43,7 +43,7 @@ let logicalTotal: UInt64 = 300_000 + 1000 + 50_000 + 20_000 + 9_000 + 70_000 + 1
 // MARK: scansione
 
 for threads in [1, 3, 16] {
-    let scanner = Scanner(threads: threads)
+    let scanner = DiskScanner(threads: threads)
     guard let tree = scanner.scan(base) else {
         check(false, "la scansione legge la cartella")
         continue
@@ -90,7 +90,7 @@ for threads in [1, 3, 16] {
 // MARK: mappa
 
 do {
-    let tree = Scanner().scan(base)!
+    let tree = DiskScanner().scan(base)!
     for (w, h) in [(800, 500), (300, 900), (37, 23)] {
         let map = Treemap(folder: tree.root, entry: -1, width: w, height: h, mode: .logical, minSide: 1) { f, i in
             !f.entries[i].isDirectory
@@ -125,7 +125,7 @@ do {
 // MARK: Cestino e Aggiorna
 
 do {
-    let tree = Scanner().scan(base)!
+    let tree = DiskScanner().scan(base)!
     let r = tree.root
     let before = r.logical
     let a = r.subfolders.first { tree.path(of: $0).hasSuffix("/a") }!
@@ -137,7 +137,7 @@ do {
 
     // un file nuovo in a/b, poi Aggiorna di a
     write("a/b/cinque.bin", 400_000)
-    let fresh = Scanner(registry: tree.extensions).rescan(a, in: tree)!
+    let fresh = DiskScanner(registry: tree.extensions).rescan(a, in: tree)!
     tree.replace(folder: a, with: fresh)
     check(r.logical == before + 400_000, "dopo Aggiorna la radice ha anche cinque.bin (e di nuovo due.jpg)")
     check(r.name(at: 0) == "a", "ora a è la voce più grande")
