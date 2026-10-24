@@ -1,0 +1,292 @@
+import Foundation
+
+/// Un riquadro della mappa: una voce di una cartella (file o cartella) e dove sta, in pixel.
+public struct Cell {
+    public unowned(unsafe) let folder: Folder
+    /// la voce in `folder.entries`; -1 per la cartella di partenza (la radice della mappa)
+    public let entry: Int32
+    public var x0: Int32, y0: Int32, x1: Int32, y1: Int32
+    /// i figli in `Treemap.cells`, uno dopo l'altro
+    public var firstChild: Int32 = -1
+    public var childCount: Int32 = 0
+
+    public var width: Int { Int(x1 - x0) }
+    public var height: Int { Int(y1 - y0) }
+    public func contains(_ x: Int, _ y: Int) -> Bool { x >= x0 && x < x1 && y >= y0 && y < y1 }
+}
+
+/// La mappa ad albero di Disk Inventory X (il «cuscino» di van Wijk e van de Wetering, con le
+/// righe di SequoiaView/WinDirStat) portata da TMVItem.m e TMVCushionRenderer.m.
+///
+/// La disposizione è in pixel interi; un riquadro più piccolo di `minSide` pixel non si divide
+/// più. Il disegno si fa a strisce orizzontali, una per core: ogni pixel appartiene a una foglia
+/// sola, quindi le strisce non si toccano.
+public final class Treemap {
+    public private(set) var cells: [Cell] = []
+    public let width: Int, height: Int
+    /// le foglie da disegnare: indice del riquadro e la superficie del cuscino
+    private var leaves: [(cell: Int32, surface: SIMD4<Double>)] = []
+
+    /// - Parameters:
+    ///   - isLeaf: se una voce va disegnata intera (file, pacchetti chiusi, cartelle vuote)
+    ///   - minSide: il lato minimo, in pixel, perché un riquadro si divida (1 punto sullo schermo)
+    public init(folder: Folder, entry: Int32, width: Int, height: Int, mode: SizeMode, minSide: Int,
+                isLeaf: (Folder, Int) -> Bool) {
+        self.width = width
+        self.height = height
+        cells.reserveCapacity(1024)
+        cells.append(Cell(folder: folder, entry: entry, x0: 0, y0: 0, x1: Int32(width), y1: Int32(height)))
+        guard width > 0, height > 0 else { return }
+        layout(0, surface: .zero, height: 0.5, mode: mode, minSide: max(1, minSide), isLeaf: isLeaf)
+    }
+
+    /// la cartella di cui il riquadro mostra il contenuto, se è una cartella
+    private func contents(of c: Cell) -> Folder? {
+        c.entry < 0 ? c.folder : c.folder.subfolder(at: Int(c.entry))
+    }
+
+    private static let cushionScale = 0.9
+    private static let minProportion = 0.4
+
+    private func layout(_ index: Int, surface: SIMD4<Double>, height h: Double, mode: SizeMode, minSide: Int,
+                        isLeaf: (Folder, Int) -> Bool) {
+        let c = cells[index]
+        let leaf = c.entry >= 0 && isLeaf(c.folder, Int(c.entry))
+        guard !leaf, let f = contents(of: c), !f.entries.isEmpty, c.width >= minSide, c.height >= minSide else {
+            leaves.append((Int32(index), surface))
+            return
+        }
+        let first = cells.count
+        let n = f.entries.count
+        cells[index].firstChild = Int32(first)
+        cells[index].childCount = Int32(n)
+        for i in 0 ..< n {
+            cells.append(Cell(folder: f, entry: Int32(i), x0: c.x0, y0: c.y0, x1: c.x0, y1: c.y0))
+        }
+        place(parent: c, total: f.size(mode), first: first, entries: f.entries, mode: mode)
+        let childHeight = h * Self.cushionScale
+        for i in 0 ..< n {
+            let k = first + i
+            let r = cells[k]
+            if r.x1 <= r.x0 || r.y1 <= r.y0 { continue }
+            layout(k, surface: Self.ridge(surface, r, childHeight), height: childHeight, mode: mode, minSide: minSide,
+                   isLeaf: isLeaf)
+        }
+    }
+
+    /// TMVItem layoutChilds: i figli (già in ordine di grandezza) su righe, ogni riga riempita
+    /// finché i riquadri non diventano troppo stretti.
+    private func place(parent c: Cell, total: UInt64, first: Int, entries: [Entry], mode: SizeMode) {
+        let n = entries.count
+        var rows: [(height: Double, count: Int)] = []
+        var widths = [Double](repeating: 0, count: n)
+        var horizontal = true
+        if total == 0 {
+            rows.append((1, n))
+            for i in 0 ..< n { widths[i] = 1 / Double(n) }
+        } else {
+            horizontal = c.width >= c.height
+            var rowWidth = 1.0
+            if horizontal {
+                if c.height > 0 { rowWidth = Double(c.width) / Double(c.height) }
+            } else if c.width > 0 {
+                rowWidth = Double(c.height) / Double(c.width)
+            }
+            let mySize = Double(total)
+            var start = 0
+            while start < n {
+                var sizeUsed = 0.0, rowHeight = 0.0
+                var i = start
+                while i < n {
+                    let childSize = Double(entries[i].size(mode))
+                    if childSize == 0 { break }
+                    sizeUsed += childSize
+                    let virtualRowHeight = sizeUsed / mySize
+                    let childWidth = childSize / mySize * rowWidth / virtualRowHeight
+                    if childWidth / virtualRowHeight < Self.minProportion && i > start { break }
+                    rowHeight = virtualRowHeight
+                    i += 1
+                }
+                // i figli vuoti vanno in coda all'ultima riga
+                if i == start { i += 1 }
+                while i < n && entries[i].size(mode) == 0 { i += 1 }
+                let used = i - start
+                let rowSize = mySize * rowHeight
+                for k in 0 ..< used {
+                    widths[start + k] = rowSize > 0 ? Double(entries[start + k].size(mode)) / rowSize : 0
+                }
+                rows.append((rowHeight, used))
+                start = i
+            }
+        }
+
+        let parentWidth = Double(horizontal ? c.width : c.height)
+        let parentHeight = Double(horizontal ? c.height : c.width)
+        let parentBottom = horizontal ? Int(c.y1) : Int(c.x1)
+        let parentRight = horizontal ? Int(c.x1) : Int(c.y1)
+        let parentLeft = horizontal ? Int(c.x0) : Int(c.y0)
+        var top = horizontal ? Int(c.y0) : Int(c.x0)
+        var child = 0
+        for (r, row) in rows.enumerated() {
+            var bottom = top + Int((row.height * parentHeight).rounded())
+            if bottom > parentBottom || r == rows.count - 1 { bottom = parentBottom }
+            var left = parentLeft
+            for col in 0 ..< row.count {
+                var right = left + Int((widths[child] * parentWidth).rounded())
+                if right > parentRight || col == row.count - 1 { right = parentRight }
+                let k = first + child
+                if horizontal {
+                    cells[k].x0 = Int32(left); cells[k].x1 = Int32(right)
+                    cells[k].y0 = Int32(top); cells[k].y1 = Int32(bottom)
+                } else {
+                    cells[k].x0 = Int32(top); cells[k].x1 = Int32(bottom)
+                    cells[k].y0 = Int32(left); cells[k].y1 = Int32(right)
+                }
+                left = right
+                child += 1
+            }
+            top = bottom
+        }
+    }
+
+    /// TMVCushionRenderer addRidgeByHeightFactor
+    private static func ridge(_ s: SIMD4<Double>, _ r: Cell, _ h: Double) -> SIMD4<Double> {
+        var s = s
+        let h4 = 4 * h
+        let wf = h4 / Double(r.width)
+        s[2] += wf * Double(r.x1 + r.x0)
+        s[0] -= wf
+        let hf = h4 / Double(r.height)
+        s[3] += hf * Double(r.y1 + r.y0)
+        s[1] -= hf
+        return s
+    }
+
+    // MARK: disegno
+
+    /// Disegna in `pixels` (RGBA, `width * height`, riga dopo riga dall'alto).
+    /// `color` dà il colore di una foglia, già normalizzato (vedi `Palette.normalize`).
+    public func render(into pixels: UnsafeMutablePointer<UInt32>, color: (Cell) -> SIMD3<Double>) {
+        let colors = leaves.map { color(cells[Int($0.cell)]) }
+        let bands = max(1, min(height, ProcessInfo.processInfo.activeProcessorCount * 4))
+        let rowsPerBand = (height + bands - 1) / bands
+        leaves.withUnsafeBufferPointer { leaves in
+            cells.withUnsafeBufferPointer { cells in
+                DispatchQueue.concurrentPerform(iterations: bands) { b in
+                    let y0 = b * rowsPerBand, y1 = min(height, y0 + rowsPerBand)
+                    guard y0 < y1 else { return }
+                    for (i, leaf) in leaves.enumerated() {
+                        let c = cells[Int(leaf.cell)]
+                        let top = max(Int(c.y0), y0), bottom = min(Int(c.y1), y1)
+                        if top >= bottom { continue }
+                        Self.shade(pixels, width, c, top, bottom, leaf.surface, colors[i])
+                    }
+                }
+            }
+        }
+    }
+
+    /// TMVCushionRenderer renderCushionInBitmapGeneric, per le righe da `top` a `bottom`
+    private static func shade(_ pixels: UnsafeMutablePointer<UInt32>, _ width: Int, _ c: Cell, _ top: Int, _ bottom: Int,
+                              _ s: SIMD4<Double>, _ color: SIMD3<Double>) {
+        let ia = 0.15
+        let isl = 1 - ia
+        let len = (1.0 + 1.0 + 100.0).squareRoot()
+        let lx = -1 / len, ly = -1 / len, lz = 10 / len
+        let scale = 2.5 / Palette.baseBrightness
+        for iy in top ..< bottom {
+            let ny = -(2 * s[1] * (Double(iy) + 0.5) + s[3])
+            let row = pixels + iy * width
+            for ix in Int(c.x0) ..< Int(c.x1) {
+                let nx = -(2 * s[0] * (Double(ix) + 0.5) + s[2])
+                let cosa = (nx * lx + ny * ly + lz) / (nx * nx + ny * ny + 1).squareRoot()
+                var b = isl * cosa
+                b = b < 0 ? ia : b + ia
+                b *= scale
+                let rgb = Palette.clamp(color * b)
+                row[ix] = UInt32(rgb.x * 255) | UInt32(rgb.y * 255) << 8 | UInt32(rgb.z * 255) << 16 | 0xFF00_0000
+            }
+        }
+    }
+
+    // MARK: ricerca
+
+    /// il percorso di riquadri (dalla radice) che contiene il pixel
+    public func path(at x: Int, _ y: Int) -> [Int] {
+        guard !cells.isEmpty, cells[0].contains(x, y) else { return [] }
+        var path = [0]
+        var k = 0
+        outer: while cells[k].childCount > 0 {
+            let first = Int(cells[k].firstChild)
+            for j in first ..< first + Int(cells[k].childCount) where cells[j].contains(x, y) {
+                path.append(j)
+                k = j
+                continue outer
+            }
+            break
+        }
+        return path
+    }
+
+    /// il riquadro di una voce, se è grande abbastanza da essere nella mappa
+    public func cell(folder: Folder, entry: Int) -> Int? {
+        // la catena di cartelle dalla voce fino alla cartella della mappa
+        var chain: [(Folder, Int)] = [(folder, entry)]
+        var f = folder
+        while f !== contents(of: cells[0]) {
+            guard let p = f.parent else { return nil }
+            chain.append((p, Int(f.index)))
+            f = p
+        }
+        var k = 0
+        for (folder, entry) in chain.reversed() {
+            guard cells[k].childCount > 0 else { return nil }
+            let j = Int(cells[k].firstChild) + entry
+            guard j < Int(cells[k].firstChild + cells[k].childCount), cells[j].folder === folder else { return nil }
+            k = j
+        }
+        return k
+    }
+}
+
+/// I colori dei tipi di file (FileTypeColors.m) e la loro normalizzazione (TMVCushionRenderer).
+public enum Palette {
+    /// tutti i colori della mappa hanno la stessa «luminosità»: somma dei componenti 1.8
+    public static let baseBrightness = 1.8
+
+    public static let base: [SIMD3<Double>] = [
+        [0, 0, 1], [1, 0, 0], [0, 1, 0], [0, 1, 1], [1, 0, 1], [1, 1, 0],
+        [0.58, 0.58, 1], [1, 0.58, 0.58], [0.58, 1, 0.58], [0.58, 1, 1], [1, 0.58, 1], [1, 1, 0.58],
+    ].map(normalize)
+
+    /// il colore dei tipi oltre i primi dodici
+    public static let other = normalize([0.5, 0.5, 0.5])
+
+    public static func normalize(_ c: SIMD3<Double>) -> SIMD3<Double> {
+        let sum = c.x + c.y + c.z
+        return clamp(sum != 0 ? c * (baseBrightness / sum) : c)
+    }
+
+    /// distribuisce agli altri due componenti quello che uno ha oltre 1
+    @inline(__always)
+    static func clamp(_ c: SIMD3<Double>) -> SIMD3<Double> {
+        var (r, g, b) = (c.x, c.y, c.z)
+        if r > 1 { distribute(&r, &g, &b) } else if g > 1 { distribute(&g, &r, &b) } else if b > 1 { distribute(&b, &r, &g) }
+        return [min(r, 1), min(g, 1), min(b, 1)]
+    }
+
+    @inline(__always)
+    private static func distribute(_ first: inout Double, _ second: inout Double, _ third: inout Double) {
+        let h = (first - 1) / 2
+        first = 1
+        second += h
+        third += h
+        if second > 1 {
+            third += second - 1
+            second = 1
+        } else if third > 1 {
+            second += third - 1
+            third = 1
+        }
+    }
+}
