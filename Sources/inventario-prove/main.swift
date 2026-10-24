@@ -38,7 +38,11 @@ write("piccolo", 10)
 try! fm.createDirectory(atPath: base + "/vuota", withIntermediateDirectories: true)
 try! fm.linkItem(atPath: base + "/grande.bin", toPath: base + "/a/stesso.bin")
 try! fm.createSymbolicLink(atPath: base + "/collegamento", withDestinationPath: "grande.bin")
-let logicalTotal: UInt64 = 300_000 + 1000 + 50_000 + 20_000 + 9_000 + 70_000 + 10 + UInt64("grande.bin".utf8.count)
+// un clone APFS (come cp -c): stessi blocchi di quattro.pdf, non deve contare due volte
+write("clonato/originale.dat", 2_000_000)
+precondition(copyfile(base + "/clonato/originale.dat", base + "/clonato/clone.dat", nil, copyfile_flags_t(COPYFILE_CLONE_FORCE)) == 0,
+             "la cartella temporanea non è su APFS")
+let logicalTotal: UInt64 = 300_000 + 1000 + 50_000 + 20_000 + 9_000 + 70_000 + 10 + UInt64("grande.bin".utf8.count) + 4_000_000
 
 // MARK: scansione
 
@@ -50,12 +54,15 @@ for threads in [1, 3, 16] {
     }
     let r = tree.root
     check(r.logical == logicalTotal, "\(threads) fili: somma logica \(r.logical) == \(logicalTotal)")
-    check(r.fileCount == 9, "\(threads) fili: 9 file (compresi collegamento e collegamento fisso), non \(r.fileCount)")
-    check(r.alloc >= r.logical - 20_000, "\(threads) fili: lo spazio su disco è plausibile")
+    check(r.fileCount == 11, "\(threads) fili: 11 file (compresi collegamento e collegamento fisso), non \(r.fileCount)")
+    check(r.alloc >= r.logical - 2_020_000 && r.alloc < r.logical - 1_900_000,
+          "\(threads) fili: lo spazio su disco conta il clone una volta sola (\(r.alloc) per \(r.logical) logici)")
+    let cloned = r.subfolders.first { tree.path(of: $0).hasSuffix("/clonato") }!
+    check(cloned.entries.filter { $0.flags.contains(.cloneSeen) }.count == 1, "\(threads) fili: uno dei due è il clone")
     // in ordine di grandezza
     let sizes = r.entries.map(\.alloc)
     check(sizes == sizes.sorted(by: >), "\(threads) fili: voci in ordine di grandezza")
-    check(r.name(at: 0) == "grande.bin", "\(threads) fili: la voce più grande è grande.bin, non \(r.name(at: 0))")
+    check(r.name(at: 0) == "clonato", "\(threads) fili: la voce più grande è clonato, non \(r.name(at: 0))")
     // il collegamento fisso conta una volta sola
     let a = r.subfolders.first { tree.path(of: $0).hasSuffix("/a") }!
     let stesso = a.entries.indices.first { a.name(at: $0) == "stesso.bin" }!
@@ -132,7 +139,7 @@ do {
     let i = a.entries.indices.first { a.name(at: $0) == "due.jpg" }!
     tree.remove(folder: a, entry: i)
     check(r.logical == before - 50_000, "togliere due.jpg toglie 50 000 byte dalla radice")
-    check(r.fileCount == 8, "e un file")
+    check(r.fileCount == 10, "e un file")
     check(r.entries[Int(a.index)].logical == a.logical, "la voce di a ha la somma nuova")
 
     // un file nuovo in a/b, poi Aggiorna di a
@@ -140,7 +147,7 @@ do {
     let fresh = DiskScanner(registry: tree.extensions).rescan(a, in: tree)!
     tree.replace(folder: a, with: fresh)
     check(r.logical == before + 400_000, "dopo Aggiorna la radice ha anche cinque.bin (e di nuovo due.jpg)")
-    check(r.name(at: 0) == "a", "ora a è la voce più grande")
+    check(r.name(at: 1) == "a", "ora a viene subito dopo clonato")
     check(tree.path(of: fresh) == base + "/a", "la cartella nuova sta al posto della vecchia")
     tree.setSizeMode(.logical)
     check(r.entries.map(\.logical) == r.entries.map(\.logical).sorted(by: >), "riordinato per dimensione logica")

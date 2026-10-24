@@ -6,6 +6,7 @@ import InventarioCore
 // uso: inventario-cli scan <cartella> [--fili N]   la scansione nuova, con i tempi
 //      inventario-cli originale <cartella>          come la fa Disk Inventory X (un filo, NSURL)
 //      inventario-cli mappa <cartella> <file.png> [LxA]   la mappa in un'immagine, con i tempi
+//      inventario-cli icona <cartella.iconset>     l'icona: una piccola mappa a cuscino
 
 func seconds(_ start: ContinuousClock.Instant) -> String {
     let d = ContinuousClock.now - start
@@ -35,6 +36,17 @@ case "scan":
     print("\(seconds(start))  \(tree.root.fileCount) file  \(scanner.folders.load(ordering: .relaxed)) cartelle  "
         + "\(gb(tree.root.alloc)) su disco  \(gb(tree.root.logical)) logici  "
         + "\(scanner.unreadable.load(ordering: .relaxed)) cartelle non leggibili  \(tree.extensions.names.count) estensioni")
+case "grandi":
+    // le voci più grandi, tre livelli
+    guard let tree = DiskScanner(threads: threads).scan(path) else { exit(1) }
+    func show(_ f: Folder, _ depth: Int) {
+        for i in f.entries.indices.prefix(depth == 0 ? 12 : 5) {
+            let e = f.entries[i]
+            print(String(repeating: "    ", count: depth) + "\(gb(e.alloc))  \(f.name(at: i))\(e.flags.contains(.mountPoint) ? " [volume]" : "")")
+            if depth < 3, let sub = f.subfolder(at: i), e.alloc > 20_000_000_000 { show(sub, depth + 1) }
+        }
+    }
+    show(tree.root, 0)
 case "originale":
     // le stesse chiavi che chiede FSItem.m, con NSDirectoryEnumerator, un filo solo
     let start = ContinuousClock.now
@@ -84,6 +96,75 @@ case "mappa":
     let out = CGImageDestinationCreateWithURL(URL(fileURLWithPath: args[3]) as CFURL, "public.png" as CFString, 1, nil)!
     CGImageDestinationAddImage(out, ctx.makeImage()!, nil)
     CGImageDestinationFinalize(out)
+case "icona":
+    // una cartella finta di file vuoti ma «lunghi» (sparsi): la mappa la misura in dimensione logica
+    let fm = FileManager.default
+    let fake = fm.temporaryDirectory.appendingPathComponent("inventario-icona-\(getpid())").path
+    try? fm.removeItem(atPath: fake)
+    let files: [(String, Int)] = [
+        ("a/1.k0", 300), ("a/2.k1", 140), ("a/3.k0", 90), ("a/4.k2", 60), ("a/5.k3", 40),
+        ("b/1.k1", 200), ("b/2.k1", 80), ("b/3.k4", 50), ("b/4.k0", 30),
+        ("c/1.k2", 150), ("c/2.k5", 60), ("c/3.k3", 40),
+        ("d/1.k4", 90), ("d/2.k0", 40), ("e.k1", 70),
+    ]
+    for (name, mb) in files {
+        let p = fake + "/" + name
+        try! fm.createDirectory(atPath: (p as NSString).deletingLastPathComponent, withIntermediateDirectories: true)
+        fm.createFile(atPath: p, contents: nil)
+        truncate(p, off_t(mb) << 20)
+    }
+    let tree = DiskScanner(mode: .logical).scan(fake)!
+    try? fm.removeItem(atPath: fake)
+    // ogni estensione k<n> col colore n della tavolozza
+    let names = tree.extensions.names
+    func color(_ c: Cell) -> SIMD3<Double> {
+        guard c.entry >= 0 else { return Palette.other }
+        let ext = names[Int(c.folder.entries[Int(c.entry)].ext)]
+        return Palette.base[Int(ext.dropFirst()) ?? 0]
+    }
+    let dir = args[2]
+    try? fm.createDirectory(atPath: dir, withIntermediateDirectories: true)
+    for (px, suffix) in [(16, "16x16"), (32, "16x16@2x"), (32, "32x32"), (64, "32x32@2x"), (128, "128x128"), (256, "128x128@2x"),
+                         (256, "256x256"), (512, "256x256@2x"), (512, "512x512"), (1024, "512x512@2x")] {
+        // la forma delle icone di macOS: un quadrato arrotondato di 824 su 1024, con un'ombra
+        let inset = Double(px) * 100 / 1024, side = Double(px) - 2 * inset
+        let n = Int(side.rounded())
+        let map = Treemap(folder: tree.root, entry: -1, width: n, height: n, mode: .logical, minSide: 1) { f, i in
+            !f.entries[i].isDirectory
+        }
+        let pixels = UnsafeMutablePointer<UInt32>.allocate(capacity: n * n)
+        map.render(into: pixels, color: color)
+        let mapCtx = CGContext(data: pixels, width: n, height: n, bitsPerComponent: 8, bytesPerRow: n * 4,
+                               space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue)!
+        let image = mapCtx.makeImage()!
+        let ctx = CGContext(data: nil, width: px, height: px, bitsPerComponent: 8, bytesPerRow: 0,
+                            space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+        let rect = CGRect(x: inset, y: inset + Double(px) * 0.01, width: side, height: side)
+        let shape = CGPath(roundedRect: rect, cornerWidth: side * 0.225, cornerHeight: side * 0.225, transform: nil)
+        ctx.saveGState()
+        ctx.setShadow(offset: CGSize(width: 0, height: -Double(px) * 0.01), blur: Double(px) * 0.02,
+                      color: CGColor(gray: 0, alpha: 0.35))
+        ctx.addPath(shape)
+        ctx.setFillColor(gray: 0, alpha: 1)
+        ctx.fillPath()
+        ctx.restoreGState()
+        ctx.saveGState()
+        ctx.addPath(shape)
+        ctx.clip()
+        ctx.interpolationQuality = .high
+        ctx.draw(image, in: rect)
+        ctx.restoreGState()
+        // un filo chiaro sul bordo
+        ctx.addPath(shape)
+        ctx.setStrokeColor(gray: 1, alpha: 0.25)
+        ctx.setLineWidth(max(1, Double(px) / 256))
+        ctx.strokePath()
+        let url = URL(fileURLWithPath: dir + "/icon_\(suffix).png")
+        let out = CGImageDestinationCreateWithURL(url as CFURL, "public.png" as CFString, 1, nil)!
+        CGImageDestinationAddImage(out, ctx.makeImage()!, nil)
+        CGImageDestinationFinalize(out)
+        pixels.deallocate()
+    }
 default:
     print("comando sconosciuto: \(args[1])")
     exit(2)

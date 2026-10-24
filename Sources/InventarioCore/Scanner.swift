@@ -18,12 +18,14 @@ public final class DiskScanner: @unchecked Sendable {
 
     private let threads: Int
     private let lock = NSCondition()
-    private var jobs: [(Folder, String)] = []
+    private var jobs: [Job] = []
     private var finished = false
     private let registry: ExtensionRegistry
     private let mode: SizeMode
-    /// i file con più nomi già contati, con la cartella dove sono stati contati
+    /// i file con più nomi e i cloni già contati, con la cartella dove sono stati contati
     private let hardlinks: Mutex<[FileKey: Folder]>
+
+    private typealias Job = (folder: Folder, path: String)
 
     /// Una scansione sola per oggetto. Per rileggere una parte di un albero si passano il suo
     /// registro delle estensioni e il suo modo di misurare.
@@ -93,12 +95,13 @@ public final class DiskScanner: @unchecked Sendable {
                 lock.unlock()
                 return
             }
-            let (folder, path) = jobs.removeLast()
+            let job = jobs.removeLast()
             lock.unlock()
 
-            var subjobs: [(Folder, String)] = []
+            let folder = job.folder
+            var subjobs: [Job] = []
             if !isCancelled {
-                list(folder, path, buffer, &cache, &subjobs)
+                list(job, buffer, &cache, &subjobs)
             }
             if !subjobs.isEmpty {
                 folder.pending.add(subjobs.count, ordering: .relaxed)
@@ -131,6 +134,12 @@ public final class DiskScanner: @unchecked Sendable {
 
     static let bufferSize = 256 * 1024
 
+    private static func mountedAt(_ fs: statfs, _ path: String) -> Bool {
+        withUnsafeBytes(of: fs.f_mntonname) { raw in
+            path.withCString { strcmp(raw.baseAddress!.assumingMemoryBound(to: CChar.self), $0) == 0 }
+        }
+    }
+
     // i valori di <sys/attr.h>
     private static let ATTR_CMN_NAME: UInt32 = 0x0000_0001
     private static let ATTR_CMN_DEVID: UInt32 = 0x0000_0002
@@ -144,10 +153,17 @@ public final class DiskScanner: @unchecked Sendable {
     private static let ATTR_FILE_LINKCOUNT: UInt32 = 0x0000_0001
     private static let ATTR_FILE_TOTALSIZE: UInt32 = 0x0000_0002
     private static let ATTR_FILE_ALLOCSIZE: UInt32 = 0x0000_0004
+    // gli attributi comuni estesi stanno al posto di quelli delle fork (FSOPT_ATTR_CMN_EXTENDED)
+    private static let FSOPT_ATTR_CMN_EXTENDED: UInt64 = 0x0000_0020
+    private static let ATTR_CMNEXT_PRIVATESIZE: UInt32 = 0x0000_0008
+    private static let ATTR_CMNEXT_CLONEID: UInt32 = 0x0000_0100
+    private static let ATTR_CMNEXT_EXT_FLAGS: UInt32 = 0x0000_0200
+    private static let EF_MAY_SHARE_BLOCKS: UInt64 = 0x0000_0001
     private static let VDIR: UInt32 = 2
     private static let VLNK: UInt32 = 5
 
-    private func list(_ folder: Folder, _ path: String, _ buffer: UnsafeMutableRawPointer, _ cache: inout ExtensionCache, _ subjobs: inout [(Folder, String)]) {
+    private func list(_ job: Job, _ buffer: UnsafeMutableRawPointer, _ cache: inout ExtensionCache, _ subjobs: inout [Job]) {
+        let (folder, path) = (job.folder, job.path)
         let fd = open(path, O_RDONLY | O_DIRECTORY | O_CLOEXEC)
         guard fd >= 0 else {
             folder.unreadable = true
@@ -155,6 +171,18 @@ public final class DiskScanner: @unchecked Sendable {
             return
         }
         defer { close(fd) }
+        // un altro volume montato qui resta una cartella vuota, come nell'originale.
+        // getattrlistbulk non sempre lo dice (/System/Volumes/Data), e il numero del dispositivo
+        // è lo stesso per il volume di sistema e quello dei dati: chiediamo dove è montato.
+        // I firmlink (/Users, /Applications…) portano dentro il volume dei dati ma non sono il
+        // suo punto di montaggio, quindi si seguono.
+        if folder.parent != nil {
+            var fs = statfs()
+            if fstatfs(fd, &fs) == 0 && Self.mountedAt(fs, path) {
+                folder.mountPoint = true
+                return
+            }
+        }
         folders.add(1, ordering: .relaxed)
 
         var al = attrlist()
@@ -163,12 +191,13 @@ public final class DiskScanner: @unchecked Sendable {
             | Self.ATTR_CMN_OBJTYPE | Self.ATTR_CMN_ACCESSMASK | Self.ATTR_CMN_FILEID
         al.dirattr = Self.ATTR_DIR_MOUNTSTATUS
         al.fileattr = Self.ATTR_FILE_LINKCOUNT | Self.ATTR_FILE_TOTALSIZE | Self.ATTR_FILE_ALLOCSIZE
+        al.forkattr = Self.ATTR_CMNEXT_PRIVATESIZE | Self.ATTR_CMNEXT_CLONEID | Self.ATTR_CMNEXT_EXT_FLAGS
 
         let base = path.hasSuffix("/") ? path : path + "/"
         var files = 0
         var bytes: UInt64 = 0
         while true {
-            let count = getattrlistbulk(fd, &al, buffer, Self.bufferSize, 0)
+            let count = getattrlistbulk(fd, &al, buffer, Self.bufferSize, Self.FSOPT_ATTR_CMN_EXTENDED)
             if count <= 0 { break }
             var p = buffer
             for _ in 0 ..< count {
@@ -240,11 +269,38 @@ public final class DiskScanner: @unchecked Sendable {
                         entry.alloc = UInt64(max(0, field.loadUnaligned(as: Int64.self)))
                         field += 8
                     }
+                    var privateSize: UInt64 = 0, cloneID: UInt64 = 0, extFlags: UInt64 = 0
+                    if returned.forkattr & Self.ATTR_CMNEXT_PRIVATESIZE != 0 {
+                        privateSize = UInt64(max(0, field.loadUnaligned(as: Int64.self)))
+                        field += 8
+                    }
+                    if returned.forkattr & Self.ATTR_CMNEXT_CLONEID != 0 {
+                        cloneID = field.loadUnaligned(as: UInt64.self)
+                        field += 8
+                    }
+                    if returned.forkattr & Self.ATTR_CMNEXT_EXT_FLAGS != 0 {
+                        extFlags = field.loadUnaligned(as: UInt64.self)
+                        field += 8
+                    }
                     if type == Self.VLNK { entry.flags.insert(.symlink) }
                     if mode & 0o111 != 0 { entry.flags.insert(.executable) }
+                    // i cloni di APFS (cp -c, le copie del Finder) condividono i blocchi: il primo
+                    // conta per intero, gli altri solo per quello che hanno di loro
+                    if extFlags & Self.EF_MAY_SHARE_BLOCKS != 0 && cloneID != 0 && links <= 1 {
+                        let key = FileKey(dev: dev, id: cloneID, clone: true)
+                        let seen = hardlinks.withLock { h in
+                            if h[key] != nil { return true }
+                            h[key] = folder
+                            return false
+                        }
+                        if seen {
+                            entry.flags.insert(.cloneSeen)
+                            entry.alloc = min(entry.alloc, privateSize)
+                        }
+                    }
                     // un file con più nomi conta una volta sola, come per du
                     if links > 1 && type != Self.VLNK {
-                        let key = FileKey(dev: dev, id: fileID)
+                        let key = FileKey(dev: dev, id: fileID, clone: false)
                         let seen = hardlinks.withLock { h in
                             if h[key] != nil { return true }
                             h[key] = folder

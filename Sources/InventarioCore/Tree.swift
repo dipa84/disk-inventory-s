@@ -29,6 +29,8 @@ public struct Entry {
         public static let hardlinkSeen = Flags(rawValue: 16)
         /// la cartella non si è lasciata leggere (permessi, Accesso completo al disco)
         public static let unreadable = Flags(rawValue: 32)
+        /// un clone (APFS) di un file già contato: occupa solo i blocchi che ha di suo
+        public static let cloneSeen = Flags(rawValue: 64)
     }
 
     public var isDirectory: Bool { flags.contains(.directory) }
@@ -57,6 +59,8 @@ public final class Folder: @unchecked Sendable {
     /// i file contenuti, a ogni profondità
     public internal(set) var fileCount: Int = 0
     public internal(set) var unreadable = false
+    /// un altro volume montato qui: non lo attraversiamo
+    public internal(set) var mountPoint = false
     /// la lettura propria più quella delle sottocartelle non ancora finite
     let pending = Atomic<Int>(1)
     /// dopo una nuova lettura (Aggiorna): i file con più nomi, da passare all'albero
@@ -116,6 +120,7 @@ public final class Folder: @unchecked Sendable {
                 entries[i].alloc = f.alloc
                 entries[i].logical = f.logical
                 if f.unreadable { entries[i].flags.insert(.unreadable) }
+                if f.mountPoint { entries[i].flags.insert(.mountPoint) }
                 n += f.fileCount
             } else {
                 n += 1
@@ -249,8 +254,8 @@ public final class Tree: @unchecked Sendable {
     }
 }
 
-/// un file sul disco: volume e numero
-struct FileKey: Hashable { let dev: Int32; let id: UInt64 }
+/// un file sul disco: volume e numero (o, per i cloni, il numero del contenuto condiviso)
+struct FileKey: Hashable { let dev: Int32; let id: UInt64; let clone: Bool }
 
 /// Le estensioni incontrate (in minuscolo), condivise fra i fili della scansione.
 public final class ExtensionRegistry: @unchecked Sendable {
