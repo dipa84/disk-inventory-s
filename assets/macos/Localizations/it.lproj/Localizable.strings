@@ -1,0 +1,4 @@
+/* generato da tools/traduzioni.py: non modificare a mano */
+
+"%@ file, %@ (molti)" = "%@ file, %@";
+"%@ file (molti)" = "%@ file";

@@ -2,6 +2,23 @@ import Darwin
 import Foundation
 import Synchronization
 
+/// Che cosa contare e dove entrare (dalle preferenze).
+public struct ScanOptions: Sendable {
+    /// i file con più nomi e i cloni di APFS contano una volta sola
+    public var countSharedOnce = true
+    /// entrare negli altri volumi montati dentro la cartella (dischi esterni in /Volumes);
+    /// quelli di /System/Volumes mai, perché sono lo stesso disco visto da un'altra parte
+    public var crossVolumes = false
+    /// le cartelle con questi nomi non si leggono (node_modules, .git…)
+    public var skipNames: Set<String> = []
+
+    public init(countSharedOnce: Bool = true, crossVolumes: Bool = false, skipNames: Set<String> = []) {
+        self.countSharedOnce = countSharedOnce
+        self.crossVolumes = crossVolumes
+        self.skipNames = skipNames
+    }
+}
+
 /// Legge una cartella e tutto quello che contiene, su tutti i core.
 ///
 /// Ogni cartella è un lavoro: un filo la apre e la legge con `getattrlistbulk` (molte voci per
@@ -22,6 +39,7 @@ public final class DiskScanner: @unchecked Sendable {
     private var finished = false
     private let registry: ExtensionRegistry
     private let mode: SizeMode
+    private let options: ScanOptions
     /// i file con più nomi e i cloni già contati, con la cartella dove sono stati contati
     private let hardlinks: Mutex<[FileKey: Folder]>
 
@@ -29,7 +47,9 @@ public final class DiskScanner: @unchecked Sendable {
 
     /// Una scansione sola per oggetto. Per rileggere una parte di un albero si passano il suo
     /// registro delle estensioni e il suo modo di misurare.
-    public init(threads: Int = 0, registry: ExtensionRegistry = ExtensionRegistry(), mode: SizeMode = .allocated) {
+    public init(threads: Int = 0, registry: ExtensionRegistry = ExtensionRegistry(), mode: SizeMode = .allocated,
+                options: ScanOptions = ScanOptions()) {
+        self.options = options
         // la lettura delle cartelle aspetta il disco: qualche filo in più dei core aiuta
         self.threads = threads > 0 ? threads : ProcessInfo.processInfo.activeProcessorCount * 2
         self.registry = registry
@@ -176,7 +196,7 @@ public final class DiskScanner: @unchecked Sendable {
         // è lo stesso per il volume di sistema e quello dei dati: chiediamo dove è montato.
         // I firmlink (/Users, /Applications…) portano dentro il volume dei dati ma non sono il
         // suo punto di montaggio, quindi si seguono.
-        if folder.parent != nil {
+        if folder.parent != nil && !(options.crossVolumes && !path.hasPrefix("/System/Volumes/")) {
             var fs = statfs()
             if fstatfs(fd, &fs) == 0 && Self.mountedAt(fs, path) {
                 folder.mountPoint = true
@@ -246,9 +266,11 @@ public final class DiskScanner: @unchecked Sendable {
                         mounted = field.loadUnaligned(as: UInt32.self) & Self.DIR_MNTSTATUS_MNTPOINT != 0
                         field += 4
                     }
-                    if mounted {
+                    if mounted && !(options.crossVolumes && !base.hasPrefix("/System/Volumes/")) {
                         // un altro volume: resta una cartella vuota, come nell'originale
                         entry.flags.insert(.mountPoint)
+                    } else if !options.skipNames.isEmpty && options.skipNames.contains(String(decoding: name, as: UTF8.self)) {
+                        entry.flags.insert(.skipped)
                     } else {
                         let sub = Folder(parent: folder, index: Int32(folder.entries.count))
                         entry.sub = Int32(folder.subfolders.count)
@@ -286,7 +308,7 @@ public final class DiskScanner: @unchecked Sendable {
                     if mode & 0o111 != 0 { entry.flags.insert(.executable) }
                     // i cloni di APFS (cp -c, le copie del Finder) condividono i blocchi: il primo
                     // conta per intero, gli altri solo per quello che hanno di loro
-                    if extFlags & Self.EF_MAY_SHARE_BLOCKS != 0 && cloneID != 0 && links <= 1 {
+                    if options.countSharedOnce && extFlags & Self.EF_MAY_SHARE_BLOCKS != 0 && cloneID != 0 && links <= 1 {
                         let key = FileKey(dev: dev, id: cloneID, clone: true)
                         let seen = hardlinks.withLock { h in
                             if h[key] != nil { return true }
@@ -299,7 +321,7 @@ public final class DiskScanner: @unchecked Sendable {
                         }
                     }
                     // un file con più nomi conta una volta sola, come per du
-                    if links > 1 && type != Self.VLNK {
+                    if options.countSharedOnce && links > 1 && type != Self.VLNK {
                         let key = FileKey(dev: dev, id: fileID, clone: false)
                         let seen = hardlinks.withLock { h in
                             if h[key] != nil { return true }

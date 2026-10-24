@@ -18,8 +18,8 @@ public struct Entry {
     public var flags: Flags
 
     public struct Flags: OptionSet, Sendable {
-        public let rawValue: UInt8
-        public init(rawValue: UInt8) { self.rawValue = rawValue }
+        public let rawValue: UInt16
+        public init(rawValue: UInt16) { self.rawValue = rawValue }
         public static let directory = Flags(rawValue: 1)
         /// un altro volume montato qui: non lo attraversiamo
         public static let mountPoint = Flags(rawValue: 2)
@@ -31,8 +31,10 @@ public struct Entry {
         public static let unreadable = Flags(rawValue: 32)
         /// un clone (APFS) di un file già contato: occupa solo i blocchi che ha di suo
         public static let cloneSeen = Flags(rawValue: 64)
-        /// non un file: lo spazio libero o l'altro spazio del volume (`ext` dice quale)
+        /// non un file: lo spazio libero, i volumi di sistema o lo spazio nascosto (`ext` dice quale)
         public static let special = Flags(rawValue: 128)
+        /// una cartella saltata per le preferenze (node_modules, .git…): non è stata letta
+        public static let skipped = Flags(rawValue: 256)
     }
 
     public var isDirectory: Bool { flags.contains(.directory) }
@@ -124,7 +126,7 @@ public final class Folder: @unchecked Sendable {
                 if f.unreadable { entries[i].flags.insert(.unreadable) }
                 if f.mountPoint { entries[i].flags.insert(.mountPoint) }
                 n += f.fileCount
-            } else {
+            } else if !entries[i].isDirectory && !entries[i].flags.contains(.special) {
                 n += 1
             }
             a &+= entries[i].alloc
@@ -203,22 +205,35 @@ public final class Tree: @unchecked Sendable {
         }
     }
 
-    public static let freeSpace: UInt32 = 1
-    public static let otherSpace: UInt32 = 2
+    /// Le voci che non sono file, nella cartella di partenza quando è un volume intero.
+    public enum Space: UInt32, CaseIterable, Sendable {
+        /// lo spazio libero del volume
+        case free = 1
+        /// gli altri volumi dello stesso contenitore APFS: memoria virtuale, Preboot, Recovery…
+        case system = 2
+        /// occupato ma non contato: cartelle protette, istantanee di Time Machine, metadati
+        case hidden = 3
 
-    /// Aggiunge (o toglie, con nil) alla cartella di partenza lo spazio libero del volume e
-    /// l'altro spazio: quello occupato ma non contato (cartelle protette, istantanee, sistema).
-    public func setSpecialSpace(free: UInt64?, other: UInt64?) {
+        public var name: String {
+            switch self {
+            case .free: L("Spazio libero")
+            case .system: L("Volumi di sistema")
+            case .hidden: L("Spazio nascosto")
+            }
+        }
+    }
+
+    /// Mette nella cartella di partenza le voci dello spazio (togliendo quelle di prima).
+    public func setSpecialSpace(_ spaces: [(Space, UInt64)]) {
         let r = root
         for i in r.entries.indices.reversed() where r.entries[i].flags.contains(.special) {
             let e = r.entries.remove(at: i)
             r.alloc &-= e.alloc
             r.logical &-= e.logical
         }
-        for (size, kind, name) in [(free, Self.freeSpace, "Spazio libero"), (other, Self.otherSpace, "Altro spazio")] {
-            guard let size, size > 0 else { continue }
-            let entry = Entry(alloc: size, logical: size, nameStart: 0, ext: kind, sub: -1, nameLen: 0, flags: .special)
-            Array(name.utf8).withUnsafeBytes { r.append(name: $0, entry: entry) }
+        for (space, size) in spaces where size > 0 {
+            let entry = Entry(alloc: size, logical: size, nameStart: 0, ext: space.rawValue, sub: -1, nameLen: 0, flags: .special)
+            Array(space.name.utf8).withUnsafeBytes { r.append(name: $0, entry: entry) }
             r.alloc &+= size
             r.logical &+= size
         }

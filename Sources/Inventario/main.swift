@@ -1,4 +1,5 @@
 import AppKit
+import InventarioCore
 import SwiftUI
 
 setlinebuf(stdout)
@@ -13,11 +14,35 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var start: NSWindow?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        Prefs.register()
         NSApp.mainMenu = makeMenu()
-        // da terminale: Inventario <cartella>
-        let args = CommandLine.arguments.dropFirst().filter { !$0.hasPrefix("-") }
-        for a in args { open(path: (a as NSString).expandingTildeInPath) }
-        if documents.isEmpty { showStart(nil) }
+        // da terminale: Inventario <cartella>; le opzioni (-AppleLanguages "(ja)") col loro valore no
+        var args = Array(CommandLine.arguments.dropFirst())
+        while let a = args.first {
+            args.removeFirst()
+            if a.hasPrefix("-") {
+                if !args.isEmpty { args.removeFirst() }
+            } else {
+                open(path: (a as NSString).expandingTildeInPath)
+            }
+        }
+        // INVENTARIO_IMPOSTAZIONI=file.png INVENTARIO_SCHEDA=n: un'immagine delle impostazioni (per le prove)
+        if let photo = ProcessInfo.processInfo.environment["INVENTARIO_IMPOSTAZIONI"] {
+            PreferencesWindow.show(tab: Int(ProcessInfo.processInfo.environment["INVENTARIO_SCHEDA"] ?? "") ?? 0)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                PreferencesWindow.photograph(to: photo)
+                NSApp.terminate(nil)
+            }
+            return
+        }
+        if documents.isEmpty {
+            switch Prefs.atLaunch {
+            case .disks: showStart(nil)
+            case .lastFolder:
+                if let last = Prefs.lastFolder, FileManager.default.fileExists(atPath: last) { open(path: last) } else { showStart(nil) }
+            case .nothing: break
+            }
+        }
         NSApp.activate()
     }
 
@@ -62,9 +87,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
         panel.allowsMultipleSelection = false
-        panel.prompt = "Leggi"
-        panel.message = "Scegli la cartella o il disco da esaminare"
+        panel.prompt = L("Leggi")
+        panel.message = L("Scegli la cartella o il disco da esaminare")
         if panel.runModal() == .OK, let url = panel.url { open(path: url.path) }
+    }
+
+    @objc func showPreferences(_ sender: Any?) {
+        PreferencesWindow.show()
     }
 
     @objc func showStart(_ sender: Any?) {
@@ -102,52 +131,54 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let backspace = String(Character(UnicodeScalar(NSBackspaceCharacter)!))
 
         menu("Disk Inventory S", [
-            item("Informazioni su Disk Inventory S", #selector(NSApplication.orderFrontStandardAboutPanel(_:))),
+            item(L("Informazioni su %@", "Disk Inventory S"), #selector(NSApplication.orderFrontStandardAboutPanel(_:))),
             .separator(),
-            item("Nascondi Disk Inventory S", #selector(NSApplication.hide(_:)), "h"),
-            item("Nascondi altre", #selector(NSApplication.hideOtherApplications(_:)), "h", [.command, .option]),
-            item("Mostra tutte", #selector(NSApplication.unhideAllApplications(_:))),
+            item(L("Impostazioni…"), #selector(showPreferences(_:)), ","),
             .separator(),
-            item("Esci da Disk Inventory S", #selector(NSApplication.terminate(_:)), "q"),
+            item(L("Nascondi %@", "Disk Inventory S"), #selector(NSApplication.hide(_:)), "h"),
+            item(L("Nascondi altre"), #selector(NSApplication.hideOtherApplications(_:)), "h", [.command, .option]),
+            item(L("Mostra tutte"), #selector(NSApplication.unhideAllApplications(_:))),
+            .separator(),
+            item(L("Esci da %@", "Disk Inventory S"), #selector(NSApplication.terminate(_:)), "q"),
         ])
-        menu("Archivio", [
-            item("Leggi una cartella…", #selector(openFolder(_:)), "o"),
-            item("Dischi", #selector(showStart(_:)), "o", [.command, .shift]),
+        menu(L("Archivio"), [
+            item(L("Leggi una cartella…"), #selector(openFolder(_:)), "o"),
+            item(L("Dischi"), #selector(showStart(_:)), "o", [.command, .shift]),
             .separator(),
-            item("Chiudi", #selector(NSWindow.performClose(_:)), "w"),
+            item(L("Chiudi"), #selector(NSWindow.performClose(_:)), "w"),
         ])
-        menu("Modifica", [
-            item("Copia il percorso", #selector(DocumentController.copyPath(_:)), "c", [.command, .option]),
+        menu(L("Modifica"), [
+            item(L("Copia il percorso"), #selector(DocumentController.copyPath(_:)), "c", [.command, .option]),
         ])
-        menu("Scelta", [
-            item("Apri", #selector(DocumentController.openSelection(_:)), down, [.command, .option]),
-            item("Mostra nel Finder", #selector(DocumentController.revealInFinder(_:)), "r"),
-            item("Anteprima", #selector(DocumentController.quickLook(_:)), "y"),
+        menu(L("Scelta"), [
+            item(L("Apri"), #selector(DocumentController.openSelection(_:)), down, [.command, .option]),
+            item(L("Mostra nel Finder"), #selector(DocumentController.revealInFinder(_:)), "r"),
+            item(L("Anteprima"), #selector(DocumentController.quickLook(_:)), "y"),
             .separator(),
-            item("Scegli la cartella che la contiene", #selector(DocumentController.selectParent(_:)), up),
-            item("Scegli la voce più grande dentro", #selector(DocumentController.selectChild(_:)), down),
+            item(L("Scegli la cartella che la contiene"), #selector(DocumentController.selectParent(_:)), up),
+            item(L("Scegli la voce più grande dentro"), #selector(DocumentController.selectChild(_:)), down),
             .separator(),
-            item("Aggiorna", #selector(DocumentController.refresh(_:)), "r", [.command, .shift]),
-            item("Aggiorna tutto", #selector(DocumentController.refreshAll(_:))),
+            item(L("Aggiorna"), #selector(DocumentController.refresh(_:)), "r", [.command, .shift]),
+            item(L("Aggiorna tutto"), #selector(DocumentController.refreshAll(_:))),
             .separator(),
-            item("Sposta nel Cestino", #selector(DocumentController.moveToTrash(_:)), backspace),
+            item(L("Sposta nel Cestino"), #selector(DocumentController.moveToTrash(_:)), backspace),
         ])
-        menu("Vista", [
-            item("Entra nella scelta", #selector(DocumentController.zoomIn(_:))),
-            item("Esci dalla cartella", #selector(DocumentController.zoomOut(_:)), "["),
-            item("Torna dentro", #selector(DocumentController.zoomForward(_:)), "]"),
-            item("Tutta la cartella", #selector(DocumentController.zoomToTop(_:)), "[", [.command, .shift]),
+        menu(L("Vista"), [
+            item(L("Entra nella scelta"), #selector(DocumentController.zoomIn(_:))),
+            item(L("Esci dalla cartella"), #selector(DocumentController.zoomOut(_:)), "["),
+            item(L("Torna dentro"), #selector(DocumentController.zoomForward(_:)), "]"),
+            item(L("Tutta la cartella"), #selector(DocumentController.zoomToTop(_:)), "[", [.command, .shift]),
             .separator(),
-            item("Dimensione logica (invece che su disco)", #selector(DocumentController.toggleSizeMode(_:))),
-            item("Apri i pacchetti", #selector(DocumentController.togglePackages(_:))),
-            item("Spazio libero e altro spazio", #selector(DocumentController.toggleSpecialSpace(_:))),
+            item(L("Dimensione logica (invece che su disco)"), #selector(DocumentController.toggleSizeMode(_:))),
+            item(L("Apri i pacchetti"), #selector(DocumentController.togglePackages(_:))),
+            item(L("Spazio libero, volumi di sistema e spazio nascosto"), #selector(DocumentController.toggleSpecialSpace(_:))),
             .separator(),
-            item("Schermo intero", #selector(NSWindow.toggleFullScreen(_:)), "f", [.command, .control]),
+            item(L("Schermo intero"), #selector(NSWindow.toggleFullScreen(_:)), "f", [.command, .control]),
         ])
-        let window = NSMenu(title: "Finestra")
-        window.addItem(item("Contrai", #selector(NSWindow.performMiniaturize(_:)), "m"))
-        window.addItem(item("Ridimensiona", #selector(NSWindow.performZoom(_:))))
-        let top = NSMenuItem(title: "Finestra", action: nil, keyEquivalent: "")
+        let window = NSMenu(title: L("Finestra"))
+        window.addItem(item(L("Contrai"), #selector(NSWindow.performMiniaturize(_:)), "m"))
+        window.addItem(item(L("Ridimensiona"), #selector(NSWindow.performZoom(_:))))
+        let top = NSMenuItem(title: L("Finestra"), action: nil, keyEquivalent: "")
         top.submenu = window
         main.addItem(top)
         NSApp.windowsMenu = window
@@ -173,7 +204,7 @@ struct StartView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Che cosa occupa il disco?")
+            Text(verbatim: L("Che cosa occupa il disco?"))
                 .font(.title2.weight(.semibold))
             List(volumes) { v in
                 Button { open(v.id.path) } label: {
@@ -182,7 +213,7 @@ struct StartView: View {
                         VStack(alignment: .leading, spacing: 4) {
                             Text(v.name).font(.headline)
                             ProgressView(value: Double(v.total - v.available), total: Double(max(v.total, 1)))
-                            Text("\(Format.size(UInt64(max(0, v.total - v.available)))) usati di \(Format.size(UInt64(max(0, v.total)))) · \(Format.size(UInt64(max(0, v.available)))) liberi")
+                            Text(verbatim: L("%@ usati di %@ · %@ liberi", Format.size(UInt64(max(0, v.total - v.available))), Format.size(UInt64(max(0, v.total))), Format.size(UInt64(max(0, v.available)))))
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                                 .monospacedDigit()
@@ -195,11 +226,11 @@ struct StartView: View {
             }
             .listStyle(.inset)
             HStack {
-                Text("Si può anche trascinare una cartella sull'icona di Disk Inventory S.")
+                Text(verbatim: L("Si può anche trascinare una cartella sull'icona di %@.", "Disk Inventory S"))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Spacer()
-                Button("Leggi una cartella…", action: choose)
+                Button(L("Leggi una cartella…"), action: choose)
                     .keyboardShortcut(.defaultAction)
             }
         }

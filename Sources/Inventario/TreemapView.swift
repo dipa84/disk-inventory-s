@@ -59,7 +59,8 @@ final class TreemapView: NSView {
         guard w > 0, h > 0 else { return }
         var start = ContinuousClock.now
         if map == nil {
-            map = Treemap(folder: c.zoom, entry: -1, width: w, height: h, mode: doc.mode, minSide: Int(scale.rounded())) { f, i in
+            let style = CushionStyle(height: Prefs.cushionHeight, ambient: Prefs.ambientLight, edges: Prefs.edges)
+            map = Treemap(folder: c.zoom, entry: -1, width: w, height: h, mode: doc.mode, minSide: Int(scale.rounded()), style: style) { f, i in
                 doc.isLeaf(f.entries[i])
             }
         }
@@ -103,7 +104,7 @@ final class TreemapView: NSView {
         ctx.draw(image, in: bounds)
         ctx.restoreGState()
 
-        if let h = hovered, let r = rect(of: h) {
+        if Prefs.hoverFrame, let h = hovered, let r = rect(of: h) {
             NSColor.white.withAlphaComponent(0.5).setStroke()
             let p = NSBezierPath(rect: r.insetBy(dx: 0.5, dy: 0.5))
             p.lineWidth = 1

@@ -24,16 +24,16 @@ final class OutlineController: NSObject, NSOutlineViewDataSource, NSOutlineViewD
     override init() {
         super.init()
         let name = NSTableColumn(identifier: .init("nome"))
-        name.title = "Nome"
+        name.title = L("Nome")
         name.width = 220
         let size = NSTableColumn(identifier: .init("dimensione"))
-        size.title = "Dimensione"
+        size.title = L("Dimensione")
         size.width = 80
         let share = NSTableColumn(identifier: .init("quota"))
         share.title = "%"
         share.width = 58
         let kind = NSTableColumn(identifier: .init("tipo"))
-        kind.title = "Tipo"
+        kind.title = L("Tipo")
         kind.width = 120
         for c in [name, size, share, kind] { view.addTableColumn(c) }
         view.outlineTableColumn = name
@@ -96,7 +96,7 @@ final class OutlineController: NSObject, NSOutlineViewDataSource, NSOutlineViewD
             cell.textField?.stringValue = doc.name(it)
             cell.imageView?.image = icon(it, doc)
             let e = it.entryValue
-            let dim = e?.flags.contains(.hardlinkSeen) == true || e?.flags.contains(.mountPoint) == true
+            let dim = e.map { !$0.flags.isDisjoint(with: [.hardlinkSeen, .cloneSeen, .mountPoint, .skipped, .special]) } == true
             cell.textField?.textColor = e?.flags.contains(.unreadable) == true ? .systemRed : dim ? .secondaryLabelColor : .labelColor
             cell.toolTip = tip(e)
         case "dimensione":
@@ -112,10 +112,7 @@ final class OutlineController: NSObject, NSOutlineViewDataSource, NSOutlineViewD
 
     private func tip(_ e: Entry?) -> String? {
         guard let e else { return nil }
-        if e.flags.contains(.unreadable) { return "Non leggibile: serve l'Accesso completo al disco" }
-        if e.flags.contains(.mountPoint) { return "Un altro volume: non è contato qui" }
-        if e.flags.contains(.hardlinkSeen) { return "Un altro nome di un file già contato altrove" }
-        return nil
+        return Document.note(e)
     }
 
     private func makeCell(_ id: NSUserInterfaceItemIdentifier) -> NSTableCellView {
@@ -154,6 +151,14 @@ final class OutlineController: NSObject, NSOutlineViewDataSource, NSOutlineViewD
     }
 
     private func icon(_ it: Item, _ doc: Document) -> NSImage {
+        if let e = it.entryValue, e.flags.contains(.special) {
+            let symbol = switch Tree.Space(rawValue: e.ext) {
+            case .free?: "circle.dashed"
+            case .system?: "gearshape.2"
+            default: "eye.slash"
+            }
+            return NSImage(systemSymbolName: symbol, accessibilityDescription: nil) ?? NSImage()
+        }
         if let e = it.entryValue, doc.kinds.isPackage(e) {
             // i pacchetti (le applicazioni) hanno ognuno la sua icona
             let path = doc.path(it)
@@ -248,13 +253,13 @@ final class KindsController: NSObject, NSTableViewDataSource, NSTableViewDelegat
     override init() {
         super.init()
         let name = NSTableColumn(identifier: .init("tipo"))
-        name.title = "Tipo"
+        name.title = L("Tipo")
         name.width = 200
         let size = NSTableColumn(identifier: .init("dimensione"))
-        size.title = "Dimensione"
+        size.title = L("Dimensione")
         size.width = 80
         let count = NSTableColumn(identifier: .init("file"))
-        count.title = "File"
+        count.title = L("File")
         count.width = 70
         for c in [name, size, count] { table.addTableColumn(c) }
         table.dataSource = self
@@ -290,7 +295,7 @@ final class KindsController: NSObject, NSTableViewDataSource, NSTableViewDelegat
         case "dimensione":
             cell.textField?.stringValue = Format.size(k.size(doc.mode))
         default:
-            cell.textField?.stringValue = Format.count(k.count)
+            cell.textField?.stringValue = doc.kinds.isSpace(ranked[row]) ? "" : Format.count(k.count)
         }
         return cell
     }

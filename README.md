@@ -47,6 +47,32 @@ interno si chiama ancora `Inventario`, il nome di lavoro.
 
 Scegliere un tipo di file nell'elenco in basso lo mette in evidenza nella mappa.
 
+## Lo spazio che non è nei file
+
+Leggendo un disco intero, la mappa mostra anche tre voci che non sono file:
+
+- **Spazio libero**: quello ancora disponibile (con lo spazio eliminabile, come il Finder, se
+  non lo si toglie nelle impostazioni);
+- **Volumi di sistema**: gli altri volumi dello stesso contenitore APFS (memoria virtuale,
+  Preboot, Recovery, aggiornamenti), misurati uno per uno con `diskutil apfs list`;
+- **Spazio nascosto**: il resto, occupato ma non leggibile come file: cartelle protette (con
+  l'Accesso completo al disco diventa più piccolo), istantanee di Time Machine, metadati.
+
+L'originale le metteva insieme in «Other space».
+
+## Impostazioni (⌘,)
+
+Generale (dimensione, unità decimali o binarie, conferma del Cestino, che cosa aprire all'avvio,
+lingua), Mappa (rilievo e luce dei cuscini, righe fra i file, bordo sotto il puntatore, 12 o 24
+tipi colorati), Scansione (cloni e collegamenti fissi una volta sola, altri volumi, pacchetti,
+cartelle da saltare), Spazio.
+
+## Lingue
+
+Italiano, inglese, spagnolo, francese, tedesco, cinese semplificato, giapponese. Le frasi stanno
+in `tools/traduzioni.py`, che genera i file `.strings` e si ferma se nel codice c'è una frase
+passata a `L()` senza traduzione. I nomi dei tipi di file li dà macOS, nella lingua dell'app.
+
 ## Costruire
 
 Bastano gli strumenti da riga di comando (Swift 6), non serve Xcode.

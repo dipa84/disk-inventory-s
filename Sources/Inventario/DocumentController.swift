@@ -43,7 +43,15 @@ final class DocumentController: NSWindowController, NSWindowDelegate, NSToolbarD
         toolbar.displayMode = .iconOnly
         window.toolbar = toolbar
         window.toolbarStyle = .unified
+        NotificationCenter.default.addObserver(self, selector: #selector(prefsChanged), name: Prefs.changed, object: nil)
         startScan()
+    }
+
+    /// le preferenze della mappa, delle unità e dello spazio valgono subito
+    @objc private func prefsChanged() {
+        guard model != nil else { return }
+        if let sel = selection, model!.isSpecial(sel) { selection = nil }
+        changed()
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -51,7 +59,7 @@ final class DocumentController: NSWindowController, NSWindowDelegate, NSToolbarD
     // MARK: scansione
 
     private func startScan() {
-        let scanner = DiskScanner()
+        let scanner = DiskScanner(mode: Prefs.logicalSize ? .logical : .allocated, options: Prefs.scanOptions)
         self.scanner = scanner
         let progress = ScanProgress(scanner: scanner, path: rootPath)
         self.progress = progress
@@ -62,6 +70,8 @@ final class DocumentController: NSWindowController, NSWindowDelegate, NSToolbarD
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             let tree = scanner.scan(path)
             let elapsed = ContinuousClock.now - start
+            // lo spazio del volume: diskutil, qualche decimo di secondo, anche questo qui
+            let space = tree == nil ? nil : VolumeSpace.measure(path)
             DispatchQueue.main.async {
                 progress.stop()
                 guard let self else { return }
@@ -70,7 +80,8 @@ final class DocumentController: NSWindowController, NSWindowDelegate, NSToolbarD
                     if ProcessInfo.processInfo.environment["INVENTARIO_MISURA"] != nil {
                         print("scansione di \(path): \(elapsed), \(tree.root.fileCount) file")
                     }
-                    self.show(Document(tree: tree), unreadable: scanner.unreadable.load(ordering: .relaxed), elapsed: elapsed)
+                    Prefs.lastFolder = path
+                    self.show(Document(tree: tree, space: space), unreadable: scanner.unreadable.load(ordering: .relaxed), elapsed: elapsed)
                 } else {
                     self.close()
                 }
@@ -90,12 +101,12 @@ final class DocumentController: NSWindowController, NSWindowDelegate, NSToolbarD
         kindsTable.reload()
         treemap.reload()
         let seconds = Double(elapsed.components.seconds) + Double(elapsed.components.attoseconds) / 1e18
-        defaultStatus = "\(Format.count(doc.tree.root.fileCount)) file, \(Format.size(doc.tree.root.size(doc.mode))) — letti in "
-            + String(format: "%.1f s", seconds)
+        readIn = String(format: "%.1f s", seconds)
         if unreadable > 0 {
-            notice.title = "\(Format.count(unreadable)) cartelle non leggibili…"
+            notice.title = L(one: "%@ cartella non leggibile…", other: "%@ cartelle non leggibili…", unreadable, Format.count(unreadable))
             notice.isHidden = false
         }
+        setDefaultStatus()
         updateStatus()
         updateToolbar()
         window?.makeFirstResponder(treemap)
@@ -117,6 +128,16 @@ final class DocumentController: NSWindowController, NSWindowDelegate, NSToolbarD
     }
 
     private var defaultStatus = ""
+    /// quanto ha messo la scansione
+    private var readIn: String?
+
+    private func setDefaultStatus() {
+        guard let doc = model else { return }
+        let n = doc.tree.root.fileCount
+        var s = L(one: "%@ file, %@", other: "%@ file, %@ (molti)", n, Format.count(n), Format.size(doc.tree.root.size(doc.mode)))
+        if let readIn { s += " — " + L("letti in %@", readIn) }
+        defaultStatus = s
+    }
 
     private func buildViews() {
         guard let window else { return }
@@ -147,7 +168,7 @@ final class DocumentController: NSWindowController, NSWindowDelegate, NSToolbarD
         notice.target = self
         notice.action = #selector(openPrivacySettings)
         notice.isHidden = true
-        notice.toolTip = "Per leggere tutto, Disk Inventory S ha bisogno dell'Accesso completo al disco (Impostazioni di Sistema › Privacy e sicurezza)."
+        notice.toolTip = L("Per leggere tutto, Disk Inventory S ha bisogno dell'Accesso completo al disco (Impostazioni di Sistema › Privacy e sicurezza).")
         let bar = NSStackView(views: [status, notice])
         bar.orientation = .horizontal
         bar.edgeInsets = NSEdgeInsets(top: 4, left: 10, bottom: 4, right: 10)
@@ -233,7 +254,8 @@ final class DocumentController: NSWindowController, NSWindowDelegate, NSToolbarD
             return
         }
         var parts = [doc.path(item), Format.size(item.size(doc.mode)), doc.kindName(item)]
-        if let f = item.contents { parts.append("\(Format.count(f.fileCount)) file") }
+        if let f = item.contents { parts.append(L(one: "%@ file", other: "%@ file (molti)", f.fileCount, Format.count(f.fileCount))) }
+        if let e = item.entryValue, let note = Document.note(e) { parts.append(note) }
         let p = Format.percent(item.size(doc.mode), of: zoom.size(doc.mode))
         if !p.isEmpty { parts.append(p) }
         status.stringValue = parts.joined(separator: "  ·  ")
@@ -341,15 +363,22 @@ final class DocumentController: NSWindowController, NSWindowDelegate, NSToolbarD
 
     @objc func moveToTrash(_ sender: Any?) {
         guard let doc = model, let sel = selection, sel.isValid, !sel.isRoot, !doc.isSpecial(sel), let window else { return }
+        guard Prefs.confirmTrash else {
+            trash(sel)
+            return
+        }
         let alert = NSAlert()
-        alert.messageText = "Spostare «\(doc.name(sel))» nel Cestino?"
-        var info = "\(Format.size(sel.size(doc.mode)))"
-        if let f = sel.contents { info += ", \(Format.count(f.fileCount)) file" }
+        alert.messageText = L("Spostare «%@» nel Cestino?", doc.name(sel))
+        var info = Format.size(sel.size(doc.mode))
+        if let f = sel.contents { info += ", " + L(one: "%@ file", other: "%@ file (molti)", f.fileCount, Format.count(f.fileCount)) }
         alert.informativeText = info + "\n" + doc.path(sel)
-        alert.addButton(withTitle: "Sposta nel Cestino")
-        alert.addButton(withTitle: "Annulla")
+        alert.addButton(withTitle: L("Sposta nel Cestino"))
+        alert.addButton(withTitle: L("Annulla"))
+        alert.showsSuppressionButton = true
+        alert.suppressionButton?.title = L("Non chiedere più")
         alert.beginSheetModal(for: window) { [weak self] response in
             guard response == .alertFirstButtonReturn, let self else { return }
+            if alert.suppressionButton?.state == .on { UserDefaults.standard.set(false, forKey: Prefs.Key.confirmTrash) }
             self.trash(sel)
         }
     }
@@ -392,9 +421,9 @@ final class DocumentController: NSWindowController, NSWindowDelegate, NSToolbarD
             (NSApp.delegate as? AppDelegate)?.open(path: rootPath, replacing: self)
             return
         }
-        let scanner = DiskScanner(registry: doc.tree.extensions, mode: doc.mode)
+        let scanner = DiskScanner(registry: doc.tree.extensions, mode: doc.mode, options: Prefs.scanOptions)
         self.scanner = scanner
-        status.stringValue = "Rileggo \(doc.tree.path(of: folder))…"
+        status.stringValue = L("Rileggo %@…", doc.tree.path(of: folder))
         let tree = doc.tree
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             let fresh = scanner.rescan(folder, in: tree)
@@ -408,10 +437,10 @@ final class DocumentController: NSWindowController, NSWindowDelegate, NSToolbarD
                 if wasInside { self.zoom = fresh }
                 self.forward.removeAll()
                 // la lettura nuova può avere estensioni nuove
-                let kinds = Document(tree: tree)
-                kinds.openPackages = doc.openPackages
-                self.model = kinds
-                kinds.tally()
+                let fresh2 = Document(tree: tree, space: doc.space)
+                fresh2.openPackages = doc.openPackages
+                self.model = fresh2
+                fresh2.tally()
                 self.selection = nil
                 self.changed()
                 self.select(Item(fresh), from: .other)
@@ -426,9 +455,7 @@ final class DocumentController: NSWindowController, NSWindowDelegate, NSToolbarD
         outline.reload()
         kindsTable.reload()
         treemap.reload()
-        if let doc = model {
-            defaultStatus = "\(Format.count(doc.tree.root.fileCount)) file, \(Format.size(doc.tree.root.size(doc.mode)))"
-        }
+        setDefaultStatus()
         updateToolbar()
         updateStatus()
     }
@@ -458,11 +485,10 @@ final class DocumentController: NSWindowController, NSWindowDelegate, NSToolbarD
         changed()
     }
 
+    /// vale per tutte le finestre: è la stessa preferenza
     @objc func toggleSpecialSpace(_ sender: Any?) {
-        guard let doc = model else { return }
-        doc.showSpecialSpace.toggle()
-        if let sel = selection, doc.isSpecial(sel) { selection = nil }
-        changed()
+        UserDefaults.standard.set(!Prefs.showSpace, forKey: Prefs.Key.showSpace)
+        NotificationCenter.default.post(name: Prefs.changed, object: nil)
     }
 
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
@@ -476,7 +502,7 @@ final class DocumentController: NSWindowController, NSWindowDelegate, NSToolbarD
             menuItem.state = doc.openPackages ? .on : .off
             return true
         case #selector(toggleSpecialSpace(_:)):
-            menuItem.state = doc.showSpecialSpace && doc.isVolume ? .on : .off
+            menuItem.state = Prefs.showSpace && doc.isVolume ? .on : .off
             return doc.isVolume
         case #selector(zoomOut(_:)), #selector(zoomToTop(_:)):
             return zoom.parent != nil
@@ -499,15 +525,15 @@ final class DocumentController: NSWindowController, NSWindowDelegate, NSToolbarD
 
     func contextMenu() -> NSMenu {
         let m = NSMenu()
-        m.addItem(withTitle: "Apri", action: #selector(openSelection(_:)), keyEquivalent: "")
-        m.addItem(withTitle: "Mostra nel Finder", action: #selector(revealInFinder(_:)), keyEquivalent: "")
-        m.addItem(withTitle: "Anteprima", action: #selector(quickLook(_:)), keyEquivalent: "")
+        m.addItem(withTitle: L("Apri"), action: #selector(openSelection(_:)), keyEquivalent: "")
+        m.addItem(withTitle: L("Mostra nel Finder"), action: #selector(revealInFinder(_:)), keyEquivalent: "")
+        m.addItem(withTitle: L("Anteprima"), action: #selector(quickLook(_:)), keyEquivalent: "")
         m.addItem(.separator())
-        m.addItem(withTitle: "Entra", action: #selector(zoomIn(_:)), keyEquivalent: "")
-        m.addItem(withTitle: "Aggiorna", action: #selector(refresh(_:)), keyEquivalent: "")
-        m.addItem(withTitle: "Copia il percorso", action: #selector(copyPath(_:)), keyEquivalent: "")
+        m.addItem(withTitle: L("Entra"), action: #selector(zoomIn(_:)), keyEquivalent: "")
+        m.addItem(withTitle: L("Aggiorna"), action: #selector(refresh(_:)), keyEquivalent: "")
+        m.addItem(withTitle: L("Copia il percorso"), action: #selector(copyPath(_:)), keyEquivalent: "")
         m.addItem(.separator())
-        m.addItem(withTitle: "Sposta nel Cestino", action: #selector(moveToTrash(_:)), keyEquivalent: "")
+        m.addItem(withTitle: L("Sposta nel Cestino"), action: #selector(moveToTrash(_:)), keyEquivalent: "")
         for i in m.items { i.target = self }
         return m
     }
@@ -532,14 +558,14 @@ final class DocumentController: NSWindowController, NSWindowDelegate, NSToolbarD
         let item = NSToolbarItem(itemIdentifier: id)
         switch id {
         case Self.zoomItem:
-            let seg = NSSegmentedControl(images: [NSImage(systemSymbolName: "chevron.left", accessibilityDescription: "Esci")!,
-                                                  NSImage(systemSymbolName: "chevron.right", accessibilityDescription: "Entra")!],
+            let seg = NSSegmentedControl(images: [NSImage(systemSymbolName: "chevron.left", accessibilityDescription: L("Esci"))!,
+                                                  NSImage(systemSymbolName: "chevron.right", accessibilityDescription: L("Entra"))!],
                                          trackingMode: .momentary, target: self, action: #selector(zoomSegment(_:)))
             seg.segmentStyle = .separated
             zoomButtons = seg
             item.view = seg
-            item.label = "Esci / Entra"
-            item.toolTip = "Esci dalla cartella (⌘[) / Entra nella scelta (↩)"
+            item.label = L("Esci / Entra")
+            item.toolTip = L("Esci dalla cartella (⌘[) / Entra nella scelta (↩)")
         case Self.pathItem:
             let pc = NSPathControl()
             pc.pathStyle = .standard
@@ -551,13 +577,13 @@ final class DocumentController: NSWindowController, NSWindowDelegate, NSToolbarD
             pc.widthAnchor.constraint(lessThanOrEqualToConstant: 700).isActive = true
             pathControl = pc
             item.view = pc
-            item.label = "Cartella mostrata"
+            item.label = L("Cartella mostrata")
         case Self.finderItem:
-            configure(item, "Mostra nel Finder", "finder", #selector(revealInFinder(_:)), "Mostra nel Finder (⌘R)")
+            configure(item, L("Mostra nel Finder"), "finder", #selector(revealInFinder(_:)), L("Mostra nel Finder (⌘R)"))
         case Self.trashItem:
-            configure(item, "Cestino", "trash", #selector(moveToTrash(_:)), "Sposta nel Cestino (⌘⌫)")
+            configure(item, L("Cestino"), "trash", #selector(moveToTrash(_:)), L("Sposta nel Cestino (⌘⌫)"))
         case Self.refreshItem:
-            configure(item, "Aggiorna", "arrow.clockwise", #selector(refresh(_:)), "Rileggi dal disco la cartella scelta (⇧⌘R)")
+            configure(item, L("Aggiorna"), "arrow.clockwise", #selector(refresh(_:)), L("Rileggi dal disco la cartella scelta (⇧⌘R)"))
         default:
             return nil
         }
@@ -663,17 +689,17 @@ struct ScanProgressView: View {
         VStack(spacing: 14) {
             ProgressView()
                 .controlSize(.large)
-            Text("Leggo \(progress.path)")
+            Text(verbatim: L("Leggo %@", progress.path))
                 .font(.headline)
                 .lineLimit(1)
                 .truncationMode(.middle)
-            Text("\(Format.count(progress.files)) file in \(Format.count(progress.folders)) cartelle · \(Format.size(progress.bytes))")
+            Text(verbatim: L("%@ file in %@ cartelle · %@", Format.count(progress.files), Format.count(progress.folders), Format.size(progress.bytes)))
                 .monospacedDigit()
                 .foregroundStyle(.secondary)
-            Text(String(format: "%.1f s", progress.seconds))
+            Text(verbatim: String(format: "%.1f s", progress.seconds))
                 .monospacedDigit()
                 .foregroundStyle(.tertiary)
-            Button(progress.cancelling ? "Annullo…" : "Annulla", action: cancel)
+            Button(progress.cancelling ? L("Annullo…") : L("Annulla"), action: cancel)
                 .keyboardShortcut(.cancelAction)
                 .disabled(progress.cancelling)
         }

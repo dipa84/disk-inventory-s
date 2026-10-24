@@ -19,10 +19,16 @@
 	<key>CFBundleIconFile</key>
 	<string>Inventario</string>
 	<key>CFBundleDevelopmentRegion</key>
-	<string>it</string>
+	<string>en</string>
 	<key>CFBundleLocalizations</key>
 	<array>
 		<string>it</string>
+		<string>en</string>
+		<string>es</string>
+		<string>fr</string>
+		<string>de</string>
+		<string>zh-Hans</string>
+		<string>ja</string>
 	</array>
 	<key>LSMinimumSystemVersion</key>
 	<string>15.0</string>

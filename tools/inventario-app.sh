@@ -6,6 +6,8 @@
 #      tools/inventario-app.sh --installa → anche in /Applications
 set -e
 cd "${0:A:h}/.."
+# le traduzioni: si ferma se una frase non è tradotta
+python3 -I tools/traduzioni.py
 swift build -c release --product Inventario
 version=$(cat VERSION)
 name="Disk Inventory S"
@@ -14,6 +16,7 @@ rm -rf "$app"
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
 cp .build/release/Inventario "$app/Contents/MacOS/"
 cp assets/macos/Inventario.icns "$app/Contents/Resources/"
+cp -R assets/macos/Localizations/*.lproj "$app/Contents/Resources/"
 sed "s/@VERSIONE@/$version/g" assets/macos/Info.plist > "$app/Contents/Info.plist"
 plutil -lint "$app/Contents/Info.plist" >/dev/null
 codesign --force --deep --sign - "$app"

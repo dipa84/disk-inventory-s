@@ -48,42 +48,58 @@ struct Item: Equatable {
 final class Document {
     let tree: Tree
     let kinds: Kinds
-    var openPackages = false
-    /// spazio libero e altro spazio, quando la cartella di partenza è un volume intero
-    var showSpecialSpace = true
-    let isVolume: Bool
+    var openPackages = Prefs.openPackages
+    /// lo spazio del volume, quando la cartella di partenza è un volume intero
+    let space: VolumeSpace?
+    /// quanto ha contato la scansione: il resto dello spazio usato è nascosto
+    private let counted: UInt64
+    var isVolume: Bool { space != nil }
     /// la tipologia scelta nell'elenco dei tipi: la mappa la mette in evidenza
     var highlightedKind: Int?
 
-    init(tree: Tree) {
+    init(tree: Tree, space: VolumeSpace?) {
         self.tree = tree
+        self.space = space
+        tree.setSpecialSpace([])
+        counted = tree.root.alloc
         kinds = Kinds(extensions: tree.extensions.names)
-        var fs = statfs()
-        isVolume = statfs(tree.rootPath, &fs) == 0 && withUnsafeBytes(of: fs.f_mntonname) {
-            String(cString: $0.baseAddress!.assumingMemoryBound(to: CChar.self))
-        } == tree.rootPath
         updateSpecialSpace()
         tally()
     }
 
-    /// Rifà le voci dello spazio libero e dell'altro spazio (dopo il Cestino cambiano).
+    /// Rifà le voci dello spazio (dopo le preferenze). Restano quelle misurate alla lettura:
+    /// il Cestino non libera spazio finché non si svuota.
     func updateSpecialSpace() {
-        tree.setSpecialSpace(free: nil, other: nil)
-        guard isVolume, showSpecialSpace else { return }
-        var fs = statfs()
-        guard statfs(tree.rootPath, &fs) == 0 else { return }
-        let total = UInt64(fs.f_blocks) * UInt64(fs.f_bsize)
-        let free = UInt64(fs.f_bavail) * UInt64(fs.f_bsize)
-        let counted = tree.root.alloc
-        tree.setSpecialSpace(free: free, other: total > free + counted ? total - free - counted : nil)
+        guard let space, Prefs.showSpace else {
+            tree.setSpecialSpace([])
+            return
+        }
+        tree.setSpecialSpace(space.spaces(counted: counted, includePurgeable: Prefs.purgeableIsFree))
     }
 
     func isSpecial(_ item: Item) -> Bool { item.entryValue?.flags.contains(.special) == true }
 
+    /// che cosa vuol dire una voce particolare (per la barra in basso e i suggerimenti)
+    static func note(_ e: Entry) -> String? {
+        if e.flags.contains(.special) {
+            switch Tree.Space(rawValue: e.ext) {
+            case .free?: return L("lo spazio ancora disponibile")
+            case .system?: return L("memoria virtuale, Preboot, Recovery, aggiornamenti di macOS")
+            default: return L("cartelle protette, istantanee di Time Machine, dati del file system")
+            }
+        }
+        if e.flags.contains(.unreadable) { return L("non leggibile: serve l'Accesso completo al disco") }
+        if e.flags.contains(.mountPoint) { return L("un altro volume: non è contato qui") }
+        if e.flags.contains(.skipped) { return L("saltata (Impostazioni › Scansione)") }
+        if e.flags.contains(.hardlinkSeen) { return L("un altro nome di un file già contato altrove") }
+        if e.flags.contains(.cloneSeen) { return L("un clone: conta solo quello che ha di suo") }
+        return nil
+    }
+
     var mode: SizeMode { tree.sizeMode }
 
     func tally() {
-        kinds.tally(tree.root, mode: mode, openPackages: openPackages)
+        kinds.tally(tree.root, mode: mode, openPackages: openPackages, colored: Prefs.coloredKinds)
     }
 
     func name(_ item: Item) -> String {
@@ -112,13 +128,21 @@ final class Document {
 }
 
 enum Format {
-    private static let bytes: ByteCountFormatter = {
+    private static let decimal: ByteCountFormatter = {
         let f = ByteCountFormatter()
         f.countStyle = .file
         return f
     }()
 
-    static func size(_ n: UInt64) -> String { bytes.string(fromByteCount: Int64(clamping: n)) }
+    private static let binary: ByteCountFormatter = {
+        let f = ByteCountFormatter()
+        f.countStyle = .binary
+        return f
+    }()
+
+    static func size(_ n: UInt64) -> String {
+        (Prefs.binaryUnits ? binary : decimal).string(fromByteCount: Int64(clamping: n))
+    }
 
     static func count(_ n: Int) -> String { n.formatted(.number) }
 

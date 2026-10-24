@@ -22,22 +22,22 @@ public final class Kinds {
     private var packageKind: [Int32] = []
     private var byName: [String: Int32] = [:]
     private var folderKind: Int32 = 0, symlinkKind: Int32 = 0, executableKind: Int32 = 0, documentKind: Int32 = 0
-    private var freeKind: Int32 = 0, otherKind: Int32 = 0
+    /// i tipi delle voci dello spazio (libero, volumi di sistema, nascosto)
+    private var spaceKinds: [Tree.Space: Int32] = [:]
 
     public init(extensions: [String]) {
         folderKind = add(UTType.folder)
         symlinkKind = add(UTType.symbolicLink)
         executableKind = add(UTType.unixExecutable)
         documentKind = add(UTType.data)
-        freeKind = add(name: "Spazio libero", type: nil)
-        otherKind = add(name: "Altro spazio", type: nil)
+        for space in Tree.Space.allCases { spaceKinds[space] = add(name: space.name, type: nil) }
         fileKind = [Int32](repeating: documentKind, count: extensions.count)
         packageKind = [Int32](repeating: -1, count: extensions.count)
         for (id, ext) in extensions.enumerated() where id > 0 {
             if let t = UTType(filenameExtension: ext), t.localizedDescription != nil, !t.isDynamic {
                 fileKind[id] = add(t)
             } else {
-                fileKind[id] = add(name: "File .\(ext)", type: nil)
+                fileKind[id] = add(name: L("File .%@", ext), type: nil)
             }
             if let t = UTType(filenameExtension: ext, conformingTo: .directory), t.conforms(to: .package), !t.isDynamic {
                 packageKind[id] = add(t)
@@ -59,12 +59,15 @@ public final class Kinds {
 
     public var folderKindIndex: Int { Int(folderKind) }
 
+    /// è uno dei tipi dello spazio (libero, volumi di sistema, nascosto)?
+    public func isSpace(_ k: Int) -> Bool { spaceKinds.values.contains(Int32(k)) }
+
     public func isPackage(_ e: Entry) -> Bool {
         e.isDirectory && packageKind[Int(e.ext)] >= 0
     }
 
     public func kind(of e: Entry) -> Int {
-        if e.flags.contains(.special) { return Int(e.ext == Tree.freeSpace ? freeKind : otherKind) }
+        if e.flags.contains(.special) { return Int(spaceKinds[Tree.Space(rawValue: e.ext) ?? .hidden]!) }
         if e.isDirectory {
             let p = packageKind[Int(e.ext)]
             return Int(p >= 0 ? p : folderKind)
@@ -76,7 +79,7 @@ public final class Kinds {
 
     /// Conta quanto occupa ogni tipo sotto `folder` e dà i colori ai dodici tipi più grandi.
     /// I pacchetti chiusi contano come un oggetto solo del loro tipo.
-    public func tally(_ folder: Folder, mode: SizeMode, openPackages: Bool) {
+    public func tally(_ folder: Folder, mode: SizeMode, openPackages: Bool, colored: Int = 12) {
         for i in kinds.indices {
             kinds[i].alloc = 0
             kinds[i].logical = 0
@@ -97,12 +100,15 @@ public final class Kinds {
             }
         }
         // i colori ai tipi veri; lo spazio libero chiaro, l'altro scuro
-        let order = kinds.indices.filter { $0 != freeKind && $0 != otherKind }.sorted { kinds[$0].size(mode) > kinds[$1].size(mode) }
+        let spaces = Set(spaceKinds.values.map(Int.init))
+        let order = kinds.indices.filter { !spaces.contains($0) }.sorted { kinds[$0].size(mode) > kinds[$1].size(mode) }
+        let palette = Palette.colors(colored)
         for (rank, k) in order.enumerated() {
-            kinds[k].color = rank < Palette.base.count && kinds[k].count > 0 ? Palette.base[rank] : Palette.other
+            kinds[k].color = rank < palette.count && kinds[k].count > 0 ? palette[rank] : Palette.other
         }
-        kinds[Int(freeKind)].color = [0.95, 0.95, 0.95]
-        kinds[Int(otherKind)].color = [0.3, 0.3, 0.3]
+        kinds[Int(spaceKinds[.free]!)].color = [0.95, 0.95, 0.95]
+        kinds[Int(spaceKinds[.system]!)].color = [0.45, 0.47, 0.55]
+        kinds[Int(spaceKinds[.hidden]!)].color = [0.25, 0.25, 0.25]
     }
 
     /// i tipi presenti, dal più grande

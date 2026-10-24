@@ -94,6 +94,20 @@ for threads in [1, 3, 16] {
     check(total == logicalTotal, "i tipi sommano tutto: \(total)")
 }
 
+// MARK: opzioni
+
+do {
+    let skip = DiskScanner(options: ScanOptions(skipNames: ["b"])).scan(base)!
+    let a = skip.root.subfolders.first { skip.path(of: $0).hasSuffix("/a") }!
+    let b = a.entries.first { $0.isDirectory }!
+    check(b.flags.contains(.skipped) && b.sub < 0 && b.alloc == 0, "la cartella b è saltata")
+    check(skip.root.fileCount == 9, "senza b mancano tre.JPG e quattro.pdf: \(skip.root.fileCount)")
+    let all = DiskScanner(options: ScanOptions(countSharedOnce: false)).scan(base)!
+    let once = DiskScanner().scan(base)!
+    check(all.root.logical == once.root.logical + 300_000, "il collegamento fisso conta di nuovo anche in dimensione logica")
+    check(all.root.alloc > once.root.alloc + 2_000_000, "contando tutto, il clone e il collegamento fisso contano di nuovo")
+}
+
 // MARK: mappa
 
 do {
