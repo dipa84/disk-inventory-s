@@ -17,7 +17,8 @@ import DiskInventoryCore
 //        dis-cli largest <folder>                   the largest entries, three levels deep
 //        dis-cli unreadable <folder>                the folders that cannot be read
 //        dis-cli map <folder> <file.png> [WxH]      the treemap as an image, with timings
-//        dis-cli icon <folder.iconset>              the app icon: a small cushion treemap
+//        dis-cli icon <folder.iconset> [style]      the app icon (glass, light or spotlight)
+//        dis-cli icon-preview <file.png>            the icon styles side by side
 //        dis-cli export <folder>…                   reads the folders and prints them for the app
 //                                                   (FolderExport, LZFSE, base64): the helper the
 //                                                   app runs with the administrator password
@@ -26,6 +27,12 @@ func seconds(_ start: ContinuousClock.Instant) -> String {
     let d = ContinuousClock.now - start
     let s = Double(d.components.seconds) + Double(d.components.attoseconds) / 1e18
     return String(format: "%.3f s", s)
+}
+
+func writePNG(_ image: CGImage, to path: String) {
+    let out = CGImageDestinationCreateWithURL(URL(fileURLWithPath: path) as CFURL, "public.png" as CFString, 1, nil)!
+    CGImageDestinationAddImage(out, image, nil)
+    CGImageDestinationFinalize(out)
 }
 
 func gb(_ bytes: UInt64) -> String { String(format: "%.2f GB", Double(bytes) / 1e9) }
@@ -131,74 +138,34 @@ case "map":
     CGImageDestinationAddImage(out, ctx.makeImage()!, nil)
     CGImageDestinationFinalize(out)
 case "icon":
-    // a fake folder of empty but “long” (sparse) files: the map measures it by logical size
-    let fm = FileManager.default
-    let fake = fm.temporaryDirectory.appendingPathComponent("dis-icon-\(getpid())").path
-    try? fm.removeItem(atPath: fake)
-    let files: [(String, Int)] = [
-        ("a/1.k0", 300), ("a/2.k1", 140), ("a/3.k0", 90), ("a/4.k2", 60), ("a/5.k3", 40),
-        ("b/1.k1", 200), ("b/2.k1", 80), ("b/3.k4", 50), ("b/4.k0", 30),
-        ("c/1.k2", 150), ("c/2.k5", 60), ("c/3.k3", 40),
-        ("d/1.k4", 90), ("d/2.k0", 40), ("e.k1", 70),
-    ]
-    for (name, mb) in files {
-        let p = fake + "/" + name
-        try! fm.createDirectory(atPath: (p as NSString).deletingLastPathComponent, withIntermediateDirectories: true)
-        fm.createFile(atPath: p, contents: nil)
-        truncate(p, off_t(mb) << 20)
-    }
-    let tree = DiskScanner(mode: .logical).scan(fake)!
-    try? fm.removeItem(atPath: fake)
-    // each extension k<n> gets palette color n
-    let names = tree.extensions.names
-    func color(_ c: Cell) -> SIMD3<Double> {
-        guard c.entry >= 0 else { return Palette.other }
-        let ext = names[Int(c.folder.entries[Int(c.entry)].ext)]
-        return Palette.base[Int(ext.dropFirst()) ?? 0]
-    }
+    // the app icon in every size of an .iconset (iconutil makes the .icns)
+    let style = args.count > 3 ? IconStyle(rawValue: args[3]) ?? .glass : .glass
     let dir = args[2]
-    try? fm.createDirectory(atPath: dir, withIntermediateDirectories: true)
+    try? FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
     for (px, suffix) in [(16, "16x16"), (32, "16x16@2x"), (32, "32x32"), (64, "32x32@2x"), (128, "128x128"), (256, "128x128@2x"),
                          (256, "256x256"), (512, "256x256@2x"), (512, "512x512"), (1024, "512x512@2x")] {
-        // the macOS icon shape: a rounded square of 824 in 1024, with a shadow
-        let inset = Double(px) * 100 / 1024, side = Double(px) - 2 * inset
-        let n = Int(side.rounded())
-        let map = Treemap(folder: tree.root, entry: -1, width: n, height: n, mode: .logical, minSide: 1) { f, i in
-            !f.entries[i].isDirectory
-        }
-        let pixels = UnsafeMutablePointer<UInt32>.allocate(capacity: n * n)
-        map.render(into: pixels, color: color)
-        let mapCtx = CGContext(data: pixels, width: n, height: n, bitsPerComponent: 8, bytesPerRow: n * 4,
-                               space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue)!
-        let image = mapCtx.makeImage()!
-        let ctx = CGContext(data: nil, width: px, height: px, bitsPerComponent: 8, bytesPerRow: 0,
-                            space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
-        let rect = CGRect(x: inset, y: inset + Double(px) * 0.01, width: side, height: side)
-        let shape = CGPath(roundedRect: rect, cornerWidth: side * 0.225, cornerHeight: side * 0.225, transform: nil)
-        ctx.saveGState()
-        ctx.setShadow(offset: CGSize(width: 0, height: -Double(px) * 0.01), blur: Double(px) * 0.02,
-                      color: CGColor(gray: 0, alpha: 0.35))
-        ctx.addPath(shape)
-        ctx.setFillColor(gray: 0, alpha: 1)
-        ctx.fillPath()
-        ctx.restoreGState()
-        ctx.saveGState()
-        ctx.addPath(shape)
-        ctx.clip()
-        ctx.interpolationQuality = .high
-        ctx.draw(image, in: rect)
-        ctx.restoreGState()
-        // a thin light line on the edge
-        ctx.addPath(shape)
-        ctx.setStrokeColor(gray: 1, alpha: 0.25)
-        ctx.setLineWidth(max(1, Double(px) / 256))
-        ctx.strokePath()
-        let url = URL(fileURLWithPath: dir + "/icon_\(suffix).png")
-        let out = CGImageDestinationCreateWithURL(url as CFURL, "public.png" as CFString, 1, nil)!
-        CGImageDestinationAddImage(out, ctx.makeImage()!, nil)
-        CGImageDestinationFinalize(out)
-        pixels.deallocate()
+        writePNG(drawIcon(size: px, style: style), to: dir + "/icon_\(suffix).png")
     }
+case "icon-preview":
+    // every style side by side, large and at Dock and Finder sizes, to choose
+    let styles = IconStyle.allCases
+    let w = 560 * styles.count, h = 700
+    let ctx = CGContext(data: nil, width: w, height: h, bitsPerComponent: 8, bytesPerRow: 0,
+                        space: CGColorSpace(name: CGColorSpace.displayP3)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+    // half light, half dark, as icons sit on both
+    ctx.setFillColor(CGColor(gray: 0.93, alpha: 1))
+    ctx.fill(CGRect(x: 0, y: h / 2, width: w, height: h / 2))
+    ctx.setFillColor(CGColor(gray: 0.16, alpha: 1))
+    ctx.fill(CGRect(x: 0, y: 0, width: w, height: h / 2))
+    for (i, style) in styles.enumerated() {
+        let x = CGFloat(i * 560)
+        ctx.draw(drawIcon(size: 512, style: style), in: CGRect(x: x + 24, y: 170, width: 512, height: 512))
+        for (j, size) in [128, 64, 32].enumerated() {
+            let img = drawIcon(size: size * 2, style: style)
+            ctx.draw(img, in: CGRect(x: x + 60 + CGFloat(j) * 170, y: 20, width: CGFloat(size), height: CGFloat(size)))
+        }
+    }
+    writePNG(ctx.makeImage()!, to: args[2])
 default:
     print("unknown command: \(args[1])")
     exit(2)
