@@ -2,14 +2,14 @@ import Darwin
 import Foundation
 import Synchronization
 
-/// Che cosa contare e dove entrare (dalle preferenze).
+/// What to count and where to go (from the settings).
 public struct ScanOptions: Sendable {
-    /// i file con più nomi e i cloni di APFS contano una volta sola
+    /// files with several names and APFS clones count only once
     public var countSharedOnce = true
-    /// entrare negli altri volumi montati dentro la cartella (dischi esterni in /Volumes);
-    /// quelli di /System/Volumes mai, perché sono lo stesso disco visto da un'altra parte
+    /// go into other volumes mounted inside the folder (external disks in /Volumes);
+    /// never those in /System/Volumes, which are the same disk seen from elsewhere
     public var crossVolumes = false
-    /// le cartelle con questi nomi non si leggono (node_modules, .git…)
+    /// folders with these names are not read (node_modules, .git…)
     public var skipNames: Set<String> = []
 
     public init(countSharedOnce: Bool = true, crossVolumes: Bool = false, skipNames: Set<String> = []) {
@@ -19,13 +19,13 @@ public struct ScanOptions: Sendable {
     }
 }
 
-/// Legge una cartella e tutto quello che contiene, su tutti i core.
+/// Reads a folder and everything in it, on all cores.
 ///
-/// Ogni cartella è un lavoro: un filo la apre e la legge con `getattrlistbulk` (molte voci per
-/// chiamata, con nome, tipo e dimensioni insieme), mette in coda le sottocartelle e passa oltre.
-/// Quando una cartella e tutte le sue sottocartelle sono lette, chi finisce l'ultima la chiude:
-/// somma le dimensioni, ordina le voci e avvisa la cartella sopra. Così anche le somme e gli
-/// ordinamenti vanno in parallelo, e la radice finisce per ultima.
+/// Each folder is a job: a thread opens it and reads it with `getattrlistbulk` (many entries per
+/// call, with name, type and sizes together), queues the subfolders and moves on.
+/// When a folder and all its subfolders have been read, whoever finishes the last one closes it:
+/// it adds up the sizes, sorts the entries and tells the folder above. So sums and sorting run
+/// in parallel too, and the root finishes last.
 public final class DiskScanner: @unchecked Sendable {
     public let files = Atomic<Int>(0)
     public let folders = Atomic<Int>(0)
@@ -40,17 +40,17 @@ public final class DiskScanner: @unchecked Sendable {
     private let registry: ExtensionRegistry
     private let mode: SizeMode
     private let options: ScanOptions
-    /// i file con più nomi e i cloni già contati, con la cartella dove sono stati contati
+    /// files with several names and clones already counted, with the folder where they were counted
     private let hardlinks: Mutex<[FileKey: Folder]>
 
     private typealias Job = (folder: Folder, path: String)
 
-    /// Una scansione sola per oggetto. Per rileggere una parte di un albero si passano il suo
-    /// registro delle estensioni e il suo modo di misurare.
+    /// One scan per object. To reread part of a tree, pass its extension registry and its size
+    /// mode.
     public init(threads: Int = 0, registry: ExtensionRegistry = ExtensionRegistry(), mode: SizeMode = .allocated,
                 options: ScanOptions = ScanOptions()) {
         self.options = options
-        // la lettura delle cartelle aspetta il disco: qualche filo in più dei core aiuta
+        // reading folders waits on the disk: a few more threads than cores help
         self.threads = threads > 0 ? threads : ProcessInfo.processInfo.activeProcessorCount * 2
         self.registry = registry
         self.mode = mode
@@ -60,7 +60,7 @@ public final class DiskScanner: @unchecked Sendable {
     public func cancel() { cancelled.store(true, ordering: .relaxed) }
     public var isCancelled: Bool { cancelled.load(ordering: .relaxed) }
 
-    /// Legge `path` e restituisce l'albero; nil se annullata o se `path` non è una cartella.
+    /// Reads `path` and returns the tree; nil if cancelled or if `path` is not a folder.
     public func scan(_ path: String) -> Tree? {
         treeRoot = path
         let root = Folder(parent: nil, index: -1)
@@ -71,10 +71,10 @@ public final class DiskScanner: @unchecked Sendable {
         return tree
     }
 
-    /// Rilegge una sottocartella dell'albero (Aggiorna): la cartella nuova va messa al posto
-    /// della vecchia con `Tree.replace`.
-    /// I file con più nomi contati fuori dalla cartella restano contati là; quelli dentro si
-    /// contano di nuovo. `Tree.replace` prende poi l'elenco nuovo.
+    /// Rereads a subfolder of the tree (Refresh): the new folder replaces the old one with
+    /// `Tree.replace`.
+    /// Files with several names counted outside the folder stay counted there; those inside are
+    /// counted again. `Tree.replace` then takes the new list.
     public func rescan(_ folder: Folder, in tree: Tree) -> Folder? {
         treeRoot = tree.rootPath
         let fresh = Folder(parent: nil, index: folder.index)
@@ -85,20 +85,20 @@ public final class DiskScanner: @unchecked Sendable {
         return fresh
     }
 
-    // MARK: il volume dei dati
+    // MARK: the data volume
 
-    /// la cartella di partenza dell'albero (anche quando se ne rilegge una parte)
+    /// the tree's starting folder (also when part of it is reread)
     private var treeRoot = ""
 
-    /// Da «/» si arriva al volume dei dati per i firmlink (/Users, /Applications…), ma non a
-    /// tutto: «macOS Install Data», .Spotlight-V100 e altre cartelle stanno solo lì. Allora,
-    /// quando l'albero comprende /System/Volumes/Data, lo leggiamo come una cartella qualunque,
-    /// saltando solo le cartelle dove portano i firmlink, che sono già contate dall'altra parte.
+    /// From “/” the firmlinks (/Users, /Applications…) lead into the data volume, but not to all
+    /// of it: “macOS Install Data”, .Spotlight-V100 and other folders exist only there. So when the
+    /// tree includes /System/Volumes/Data we read it like any folder, skipping only the folders the
+    /// firmlinks lead to, which are already counted on the other side.
     private var includesDataVolume: Bool { ["/", "/System", "/System/Volumes"].contains(treeRoot) }
 
     private static let dataVolume = "/System/Volumes/Data"
 
-    /// dove portano i firmlink, nel volume dei dati (da /usr/share/firmlinks: «/Users\tUsers»)
+    /// where the firmlinks lead, in the data volume (from /usr/share/firmlinks: “/Users\tUsers”)
     private static let firmlinkTargets: Set<String> = {
         guard let text = try? String(contentsOfFile: "/usr/share/firmlinks", encoding: .utf8) else { return [] }
         return Set(text.split(separator: "\n").compactMap { line in
@@ -108,7 +108,7 @@ public final class DiskScanner: @unchecked Sendable {
     }()
 
     private func run(_ root: Folder, _ path: String) -> Bool {
-        // la radice la apriamo anche se è un collegamento simbolico (/tmp)
+        // the root is opened even if it is a symbolic link (/tmp)
         var st = stat()
         guard stat(path, &st) == 0, (st.st_mode & S_IFMT) == S_IFDIR else { return false }
         jobs = [(root, path)]
@@ -158,7 +158,7 @@ public final class DiskScanner: @unchecked Sendable {
         }
     }
 
-    /// La lettura di `folder` è finita: se non aspetta più nessuno la chiude, e risale.
+    /// Reading `folder` is done: if it is not waiting for anyone, close it and go up.
     private func complete(_ folder: Folder) {
         var f = folder
         while true {
@@ -184,7 +184,7 @@ public final class DiskScanner: @unchecked Sendable {
         }
     }
 
-    // i valori di <sys/attr.h>
+    // values from <sys/attr.h>
     private static let ATTR_CMN_NAME: UInt32 = 0x0000_0001
     private static let ATTR_CMN_DEVID: UInt32 = 0x0000_0002
     private static let ATTR_CMN_OBJTYPE: UInt32 = 0x0000_0008
@@ -197,7 +197,7 @@ public final class DiskScanner: @unchecked Sendable {
     private static let ATTR_FILE_LINKCOUNT: UInt32 = 0x0000_0001
     private static let ATTR_FILE_TOTALSIZE: UInt32 = 0x0000_0002
     private static let ATTR_FILE_ALLOCSIZE: UInt32 = 0x0000_0004
-    // gli attributi comuni estesi stanno al posto di quelli delle fork (FSOPT_ATTR_CMN_EXTENDED)
+    // extended common attributes take the place of the fork ones (FSOPT_ATTR_CMN_EXTENDED)
     private static let FSOPT_ATTR_CMN_EXTENDED: UInt64 = 0x0000_0020
     private static let ATTR_CMNEXT_PRIVATESIZE: UInt32 = 0x0000_0008
     private static let ATTR_CMNEXT_CLONEID: UInt32 = 0x0000_0100
@@ -215,11 +215,11 @@ public final class DiskScanner: @unchecked Sendable {
             return
         }
         defer { close(fd) }
-        // un altro volume montato qui resta una cartella vuota, come nell'originale.
-        // getattrlistbulk non sempre lo dice (/System/Volumes/Data), e il numero del dispositivo
-        // è lo stesso per il volume di sistema e quello dei dati: chiediamo dove è montato.
-        // I firmlink (/Users, /Applications…) portano dentro il volume dei dati ma non sono il
-        // suo punto di montaggio, quindi si seguono.
+        // another volume mounted here stays an empty folder, as in the original.
+        // getattrlistbulk does not always say so (/System/Volumes/Data), and the device number is the
+        // same for the system and data volumes: ask where it is mounted.
+        // Firmlinks (/Users, /Applications…) lead into the data volume but are not its mount point,
+        // so they are followed.
         if folder.parent != nil && !(options.crossVolumes && !path.hasPrefix("/System/Volumes/"))
             && !(includesDataVolume && path == Self.dataVolume) {
             var fs = statfs()
@@ -239,7 +239,7 @@ public final class DiskScanner: @unchecked Sendable {
         al.forkattr = Self.ATTR_CMNEXT_PRIVATESIZE | Self.ATTR_CMNEXT_CLONEID | Self.ATTR_CMNEXT_EXT_FLAGS
 
         let base = path.hasSuffix("/") ? path : path + "/"
-        // dentro il volume dei dati (letto da «/»), le cartelle dei firmlink sono già contate
+        // inside the data volume (read from “/”), the firmlink folders are already counted
         let checkFirmlinks = includesDataVolume && (path == Self.dataVolume || path.hasPrefix(Self.dataVolume + "/"))
         var files = 0
         var bytes: UInt64 = 0
@@ -261,7 +261,7 @@ public final class DiskScanner: @unchecked Sendable {
                 guard returned.commonattr & Self.ATTR_CMN_NAME != 0 else { continue }
                 let nameRef = field.loadUnaligned(as: attrreference_t.self)
                 let namePtr = field + Int(nameRef.attr_dataoffset)
-                // la lunghezza comprende lo zero finale
+                // the length includes the trailing zero
                 let name = UnsafeRawBufferPointer(start: namePtr, count: max(0, Int(nameRef.attr_length) - 1))
                 field += MemoryLayout<attrreference_t>.size
                 var dev: Int32 = 0
@@ -298,7 +298,7 @@ public final class DiskScanner: @unchecked Sendable {
                         mounted = false
                     }
                     if mounted && !(options.crossVolumes && !base.hasPrefix("/System/Volumes/")) {
-                        // un altro volume: resta una cartella vuota, come nell'originale
+                        // another volume: it stays an empty folder, as in the original
                         entry.flags.insert(.mountPoint)
                     } else if checkFirmlinks && Self.firmlinkTargets.contains(childPath) {
                         entry.flags.insert(.firmlinked)
@@ -339,8 +339,8 @@ public final class DiskScanner: @unchecked Sendable {
                     }
                     if type == Self.VLNK { entry.flags.insert(.symlink) }
                     if mode & 0o111 != 0 { entry.flags.insert(.executable) }
-                    // i cloni di APFS (cp -c, le copie del Finder) condividono i blocchi: il primo
-                    // conta per intero, gli altri solo per quello che hanno di loro
+                    // APFS clones (cp -c, Finder copies) share blocks: the first one counts in full,
+                    // the others only for what is their own
                     if options.countSharedOnce && extFlags & Self.EF_MAY_SHARE_BLOCKS != 0 && cloneID != 0 && links <= 1 {
                         let key = FileKey(dev: dev, id: cloneID, clone: true)
                         let seen = hardlinks.withLock { h in
@@ -353,7 +353,7 @@ public final class DiskScanner: @unchecked Sendable {
                             entry.alloc = min(entry.alloc, privateSize)
                         }
                     }
-                    // un file con più nomi conta una volta sola, come per du
+                    // a file with several names counts only once, as with du
                     if options.countSharedOnce && links > 1 && type != Self.VLNK {
                         let key = FileKey(dev: dev, id: fileID, clone: false)
                         let seen = hardlinks.withLock { h in
@@ -378,8 +378,8 @@ public final class DiskScanner: @unchecked Sendable {
     }
 }
 
-/// Le estensioni già viste da un filo: le corte (fino a 7 byte) stanno in un intero, così il
-/// registro condiviso (con il suo lucchetto) si tocca solo la prima volta.
+/// Extensions a thread has already seen: short ones (up to 7 bytes) fit in an integer, so the
+/// shared registry (with its lock) is touched only the first time.
 struct ExtensionCache {
     private var short: [UInt64: UInt32] = [:]
 
@@ -389,7 +389,7 @@ struct ExtensionCache {
         var dot = n - 1
         while dot > 0 && name[dot] != UInt8(ascii: ".") { dot -= 1 }
         let len = n - dot - 1
-        // niente estensione: «.DS_Store», «Makefile», «nome.» o code troppo lunghe
+        // no extension: “.DS_Store”, “Makefile”, “name.” or tails that are too long
         guard dot > 0, len > 0, len <= 15 else { return 0 }
         if len <= 7 {
             var key: UInt64 = 0

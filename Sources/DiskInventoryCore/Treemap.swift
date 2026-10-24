@@ -1,12 +1,12 @@
 import Foundation
 
-/// Un riquadro della mappa: una voce di una cartella (file o cartella) e dove sta, in pixel.
+/// A tile of the map: an entry of a folder (file or folder) and where it is, in pixels.
 public struct Cell {
     public unowned(unsafe) let folder: Folder
-    /// la voce in `folder.entries`; -1 per la cartella di partenza (la radice della mappa)
+    /// the entry in `folder.entries`; -1 for the starting folder (the map's root)
     public let entry: Int32
     public var x0: Int32, y0: Int32, x1: Int32, y1: Int32
-    /// i figli in `Treemap.cells`, uno dopo l'altro
+    /// the children in `Treemap.cells`, one after the other
     public var firstChild: Int32 = -1
     public var childCount: Int32 = 0
 
@@ -15,19 +15,19 @@ public struct Cell {
     public func contains(_ x: Int, _ y: Int) -> Bool { x >= x0 && x < x1 && y >= y0 && y < y1 }
 }
 
-/// La mappa ad albero di Disk Inventory X (il «cuscino» di van Wijk e van de Wetering, con le
-/// righe di SequoiaView/WinDirStat) portata da TMVItem.m e TMVCushionRenderer.m.
+/// Disk Inventory X's treemap (van Wijk and van de Wetering's cushions, with the rows of
+/// SequoiaView/WinDirStat) ported from TMVItem.m and TMVCushionRenderer.m.
 ///
-/// La disposizione è in pixel interi; un riquadro più piccolo di `minSide` pixel non si divide
-/// più. Il disegno si fa a strisce orizzontali, una per core: ogni pixel appartiene a una foglia
-/// sola, quindi le strisce non si toccano.
-/// L'aspetto dei cuscini (dalle preferenze).
+/// The layout is in whole pixels; a tile smaller than `minSide` pixels is not divided further.
+/// Drawing is done in horizontal bands, one per core: each pixel belongs to a single leaf, so
+/// the bands never touch.
+/// How the cushions look (from the settings).
 public struct CushionStyle: Sendable {
-    /// il rilievo del primo livello (l'originale: 0,5); 0 è piatto
+    /// the relief of the first level (the original: 0.5); 0 is flat
     public var height = 0.5
-    /// la luce che arriva anche dove il cuscino non è illuminato (l'originale: 0,15)
+    /// the light that reaches even where the cushion is not lit (the original: 0.15)
     public var ambient = 0.15
-    /// una riga scura fra un file e l'altro
+    /// a dark line between files
     public var edges = false
 
     public init(height: Double = 0.5, ambient: Double = 0.15, edges: Bool = false) {
@@ -40,12 +40,12 @@ public struct CushionStyle: Sendable {
 public final class Treemap {
     public private(set) var cells: [Cell] = []
     public let width: Int, height: Int
-    /// le foglie da disegnare: indice del riquadro e la superficie del cuscino
+    /// the leaves to draw: tile index and cushion surface
     private var leaves: [(cell: Int32, surface: SIMD4<Double>)] = []
 
     /// - Parameters:
-    ///   - isLeaf: se una voce va disegnata intera (file, pacchetti chiusi, cartelle vuote)
-    ///   - minSide: il lato minimo, in pixel, perché un riquadro si divida (1 punto sullo schermo)
+    ///   - isLeaf: whether an entry is drawn whole (files, closed packages, empty folders)
+    ///   - minSide: the smallest side, in pixels, for a tile to be divided (1 point on screen)
     public let style: CushionStyle
 
     public init(folder: Folder, entry: Int32, width: Int, height: Int, mode: SizeMode, minSide: Int,
@@ -59,7 +59,7 @@ public final class Treemap {
         layout(0, surface: .zero, height: style.height, mode: mode, minSide: max(1, minSide), isLeaf: isLeaf)
     }
 
-    /// la cartella di cui il riquadro mostra il contenuto, se è una cartella
+    /// the folder whose contents the tile shows, if it is a folder
     private func contents(of c: Cell) -> Folder? {
         c.entry < 0 ? c.folder : c.folder.subfolder(at: Int(c.entry))
     }
@@ -93,8 +93,8 @@ public final class Treemap {
         }
     }
 
-    /// TMVItem layoutChilds: i figli (già in ordine di grandezza) su righe, ogni riga riempita
-    /// finché i riquadri non diventano troppo stretti.
+    /// TMVItem layoutChilds: the children (already sorted by size) in rows, each row filled until
+    /// the tiles get too narrow.
     private func place(parent c: Cell, total: UInt64, first: Int, entries: [Entry], mode: SizeMode) {
         let n = entries.count
         var rows: [(height: Double, count: Int)] = []
@@ -126,7 +126,7 @@ public final class Treemap {
                     rowHeight = virtualRowHeight
                     i += 1
                 }
-                // i figli vuoti vanno in coda all'ultima riga
+                // empty children go at the end of the last row
                 if i == start { i += 1 }
                 while i < n && entries[i].size(mode) == 0 { i += 1 }
                 let used = i - start
@@ -181,10 +181,10 @@ public final class Treemap {
         return s
     }
 
-    // MARK: disegno
+    // MARK: drawing
 
-    /// Disegna in `pixels` (RGBA, `width * height`, riga dopo riga dall'alto).
-    /// `color` dà il colore di una foglia, già normalizzato (vedi `Palette.normalize`).
+    /// Draws into `pixels` (RGBA, `width * height`, row by row from the top).
+    /// `color` gives a leaf's color, already normalized (see `Palette.normalize`).
     public func render(into pixels: UnsafeMutablePointer<UInt32>, color: (Cell) -> SIMD3<Double>) {
         let colors = leaves.map { color(cells[Int($0.cell)]) }
         let bands = max(1, min(height, ProcessInfo.processInfo.activeProcessorCount * 4))
@@ -205,11 +205,11 @@ public final class Treemap {
         }
     }
 
-    /// TMVCushionRenderer renderCushionInBitmapGeneric, per le righe da `top` a `bottom`
+    /// TMVCushionRenderer renderCushionInBitmapGeneric, for the rows from `top` to `bottom`
     private static func shade(_ pixels: UnsafeMutablePointer<UInt32>, _ width: Int, _ c: Cell, _ top: Int, _ bottom: Int,
                               _ s: SIMD4<Double>, _ color: SIMD3<Double>, _ style: CushionStyle) {
         let ia = style.ambient
-        // il bordo: la prima riga e la prima colonna di ogni file, se è largo almeno 3 pixel
+        // the edge: the first row and column of each file, if it is at least 3 pixels wide
         let edgeX = style.edges && c.width >= 3 ? Int(c.x0) : -1
         let edgeY = style.edges && c.height >= 3 ? Int(c.y0) : -1
         let isl = 1 - ia
@@ -232,9 +232,9 @@ public final class Treemap {
         }
     }
 
-    // MARK: ricerca
+    // MARK: lookup
 
-    /// il percorso di riquadri (dalla radice) che contiene il pixel
+    /// the path of tiles (from the root) containing the pixel
     public func path(at x: Int, _ y: Int) -> [Int] {
         guard !cells.isEmpty, cells[0].contains(x, y) else { return [] }
         var path = [0]
@@ -251,9 +251,9 @@ public final class Treemap {
         return path
     }
 
-    /// il riquadro di una voce, se è grande abbastanza da essere nella mappa
+    /// the tile of an entry, if it is big enough to be in the map
     public func cell(folder: Folder, entry: Int) -> Int? {
-        // la catena di cartelle dalla voce fino alla cartella della mappa
+        // the chain of folders from the entry up to the map's folder
         var chain: [(Folder, Int)] = [(folder, entry)]
         var f = folder
         while f !== contents(of: cells[0]) {
@@ -272,9 +272,9 @@ public final class Treemap {
     }
 }
 
-/// I colori dei tipi di file (FileTypeColors.m) e la loro normalizzazione (TMVCushionRenderer).
+/// The file kind colors (FileTypeColors.m) and their normalization (TMVCushionRenderer).
 public enum Palette {
-    /// tutti i colori della mappa hanno la stessa «luminosità»: somma dei componenti 1.8
+    /// all map colors have the same “brightness”: components summing to 1.8
     public static let baseBrightness = 1.8
 
     public static let base: [SIMD3<Double>] = [
@@ -282,12 +282,12 @@ public enum Palette {
         [0.58, 0.58, 1], [1, 0.58, 0.58], [0.58, 1, 0.58], [0.58, 1, 1], [1, 0.58, 1], [1, 1, 0.58],
     ].map(normalize)
 
-    /// `n` colori: i dodici dell'originale, poi altre tinte a metà strada fra quelle
+    /// `n` colors: the original twelve, then further hues halfway between them
     public static func colors(_ n: Int) -> [SIMD3<Double>] {
         var result = Array(base.prefix(n))
         var i = 0
         while result.count < n {
-            // tinte intermedie, a due saturazioni, normalizzate come le altre
+            // in-between hues, at two saturations, normalized like the others
             let hue = (Double(i % 12) + 0.5) / 12
             let sat = i < 12 ? 1.0 : 0.5
             result.append(normalize(hsv(hue, sat)))
@@ -304,7 +304,7 @@ public enum Palette {
         return [k(5), k(3), k(1)]
     }
 
-    /// il colore dei tipi oltre quelli colorati
+    /// the color of the kinds beyond the colored ones
     public static let other = normalize([0.5, 0.5, 0.5])
 
     public static func normalize(_ c: SIMD3<Double>) -> SIMD3<Double> {
@@ -312,7 +312,7 @@ public enum Palette {
         return clamp(sum != 0 ? c * (baseBrightness / sum) : c)
     }
 
-    /// distribuisce agli altri due componenti quello che uno ha oltre 1
+    /// spreads to the other two components what one has above 1
     @inline(__always)
     static func clamp(_ c: SIMD3<Double>) -> SIMD3<Double> {
         var (r, g, b) = (c.x, c.y, c.z)

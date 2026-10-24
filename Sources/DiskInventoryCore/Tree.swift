@@ -1,18 +1,18 @@
 import Foundation
 import Synchronization
 
-/// Una voce di una cartella: un file, una sottocartella, un collegamento.
-/// Compatta (32 byte) perché un disco intero ne ha milioni.
+/// An entry of a folder: a file, a subfolder, a link.
+/// Compact (32 bytes) because a whole disk has millions of them.
 public struct Entry {
-    /// byte occupati sul disco (blocchi allocati, tutte le fork)
+    /// bytes taken on disk (allocated blocks, all forks)
     public var alloc: UInt64
-    /// byte del contenuto (dimensione logica, tutte le fork)
+    /// bytes of content (logical size, all forks)
     public var logical: UInt64
-    /// dove comincia il nome in `Folder.names`
+    /// where the name starts in `Folder.names`
     var nameStart: UInt32
-    /// estensione nel registro dell'albero (0 = nessuna)
+    /// extension in the tree's registry (0 = none)
     public var ext: UInt32
-    /// la sottocartella in `Folder.subfolders`, -1 se non è una cartella
+    /// the subfolder in `Folder.subfolders`, -1 if it is not a folder
     public var sub: Int32
     var nameLen: UInt16
     public var flags: Flags
@@ -21,21 +21,21 @@ public struct Entry {
         public let rawValue: UInt16
         public init(rawValue: UInt16) { self.rawValue = rawValue }
         public static let directory = Flags(rawValue: 1)
-        /// un altro volume montato qui: non lo attraversiamo
+        /// another volume mounted here: we do not go through it
         public static let mountPoint = Flags(rawValue: 2)
         public static let symlink = Flags(rawValue: 4)
         public static let executable = Flags(rawValue: 8)
-        /// un collegamento fisso già contato altrove: occupa 0
+        /// a hard link already counted elsewhere: takes 0
         public static let hardlinkSeen = Flags(rawValue: 16)
-        /// la cartella non si è lasciata leggere (permessi, Accesso completo al disco)
+        /// the folder could not be read (permissions, Full Disk Access)
         public static let unreadable = Flags(rawValue: 32)
-        /// un clone (APFS) di un file già contato: occupa solo i blocchi che ha di suo
+        /// an (APFS) clone of a file already counted: takes only its own blocks
         public static let cloneSeen = Flags(rawValue: 64)
-        /// non un file: lo spazio libero, i volumi di sistema o lo spazio nascosto (`ext` dice quale)
+        /// not a file: free space, system volumes, folders not read or file system data (`ext` says which)
         public static let special = Flags(rawValue: 128)
-        /// una cartella saltata per le preferenze (node_modules, .git…): non è stata letta
+        /// a folder skipped by the settings (node_modules, .git…): it was not read
         public static let skipped = Flags(rawValue: 256)
-        /// nel volume dei dati, una cartella dove porta un firmlink (/Users…): contata là
+        /// in the data volume, a folder a firmlink leads to (/Users…): counted there
         public static let firmlinked = Flags(rawValue: 512)
     }
 
@@ -45,34 +45,34 @@ public struct Entry {
 }
 
 public enum SizeMode: Sendable {
-    /// quanto occupa sul disco: quello che si libera cancellando
+    /// how much it takes on disk: what deleting frees
     case allocated
-    /// quanto è lungo il contenuto
+    /// how long the content is
     case logical
 }
 
-/// Una cartella letta dal disco. Le voci restano in ordine di grandezza (la più grande prima).
+/// A folder read from disk. Entries stay sorted by size (largest first).
 public final class Folder: @unchecked Sendable {
     public internal(set) unowned(unsafe) var parent: Folder?
-    /// la posizione della voce che la rappresenta in `parent.entries`
+    /// the position of the entry representing it in `parent.entries`
     public internal(set) var index: Int32
     public internal(set) var entries: [Entry] = []
     public internal(set) var subfolders: [Folder] = []
-    /// i nomi delle voci, UTF-8, uno dopo l'altro
+    /// the entries' names, UTF-8, one after the other
     var names: [UInt8] = []
     public internal(set) var alloc: UInt64 = 0
     public internal(set) var logical: UInt64 = 0
-    /// i file contenuti, a ogni profondità
+    /// the files contained, at any depth
     public internal(set) var fileCount: Int = 0
     public internal(set) var unreadable = false
-    /// un altro volume montato qui: non lo attraversiamo
+    /// another volume mounted here: we do not go through it
     public internal(set) var mountPoint = false
-    /// la lettura propria più quella delle sottocartelle non ancora finite
+    /// its own reading plus that of the subfolders not finished yet
     let pending = Atomic<Int>(1)
-    /// dopo una nuova lettura (Aggiorna): i file con più nomi, da passare all'albero
+    /// after a reread (Refresh): files with several names, to hand to the tree
     var hardlinks: [FileKey: Folder]?
 
-    /// se è questa cartella o sta dentro `other`
+    /// whether it is this folder or inside `other`
     func isInside(_ other: Folder) -> Bool {
         var f: Folder? = self
         while let c = f {
@@ -101,7 +101,7 @@ public final class Folder: @unchecked Sendable {
         return s >= 0 ? subfolders[Int(s)] : nil
     }
 
-    /// la profondità sotto la radice (la radice è 0)
+    /// the depth below the root (the root is 0)
     public var depth: Int {
         var d = 0
         var f = parent
@@ -117,7 +117,7 @@ public final class Folder: @unchecked Sendable {
         entries.append(e)
     }
 
-    /// Somma le sottocartelle (già finite) e mette le voci in ordine di grandezza.
+    /// Adds up the (finished) subfolders and sorts the entries by size.
     func finish(_ mode: SizeMode) {
         var a: UInt64 = 0, l: UInt64 = 0, n = 0
         for i in entries.indices {
@@ -152,12 +152,12 @@ public final class Folder: @unchecked Sendable {
     }
 }
 
-/// L'albero di una scansione: la cartella di partenza e le estensioni incontrate.
+/// The tree of a scan: the starting folder and the extensions met.
 public final class Tree: @unchecked Sendable {
     public let root: Folder
-    /// i file con più nomi già contati e dove: chi rilegge una parte deve saperlo
+    /// files with several names already counted, and where: rereading a part needs to know
     var hardlinks: [FileKey: Folder] = [:]
-    /// il percorso della cartella di partenza
+    /// the path of the starting folder
     public let rootPath: String
     public let extensions: ExtensionRegistry
     public internal(set) var sizeMode: SizeMode = .allocated
@@ -192,7 +192,7 @@ public final class Tree: @unchecked Sendable {
         return (base.hasSuffix("/") ? base : base + "/") + folder.name(at: i)
     }
 
-    /// Cambia fra dimensione su disco e dimensione logica: riordina tutto (in parallelo).
+    /// Switches between size on disk and logical size: re-sorts everything (in parallel).
     public func setSizeMode(_ mode: SizeMode) {
         guard mode != sizeMode else { return }
         sizeMode = mode
@@ -207,28 +207,28 @@ public final class Tree: @unchecked Sendable {
         }
     }
 
-    /// Le voci che non sono file, nella cartella di partenza quando è un volume intero.
+    /// The entries that are not files, in the starting folder when it is a whole volume.
     public enum Space: UInt32, CaseIterable, Sendable {
-        /// lo spazio libero del volume
+        /// the volume's free space
         case free = 1
-        /// gli altri volumi dello stesso contenitore APFS: memoria virtuale, Preboot, Recovery…
+        /// the other volumes of the same APFS container: virtual memory, Preboot, Recovery…
         case system = 2
-        /// occupato ma non contato, quando ci sono cartelle che non si sono lasciate leggere
+        /// used but not counted, while there are folders that could not be read
         case unread = 3
-        /// occupato ma non contato, quando si è letto tutto: i dati propri del file system
+        /// used but not counted, once everything was read: the file system's own data
         case filesystem = 4
 
         public var name: String {
             switch self {
-            case .free: L("Spazio libero")
-            case .system: L("Volumi di sistema")
-            case .unread: L("Cartelle non lette")
-            case .filesystem: L("Dati del file system")
+            case .free: L("Free Space")
+            case .system: L("System Volumes")
+            case .unread: L("Folders Not Read")
+            case .filesystem: L("File System Data")
             }
         }
     }
 
-    /// Mette nella cartella di partenza le voci dello spazio (togliendo quelle di prima).
+    /// Puts the space entries into the starting folder (removing the previous ones).
     public func setSpecialSpace(_ spaces: [(Space, UInt64)]) {
         let r = root
         for i in r.entries.indices.reversed() where r.entries[i].flags.contains(.special) {
@@ -245,7 +245,7 @@ public final class Tree: @unchecked Sendable {
         r.sortEntries(sizeMode)
     }
 
-    /// Toglie una voce (portata nel Cestino) e aggiorna le somme fino alla radice.
+    /// Removes an entry (moved to the Trash) and updates the sums up to the root.
     public func remove(folder: Folder, entry i: Int) {
         let e = folder.entries[i]
         let files = e.sub >= 0 ? folder.subfolders[Int(e.sub)].fileCount : 1
@@ -266,7 +266,7 @@ public final class Tree: @unchecked Sendable {
         }
     }
 
-    /// Mette al posto di una sottocartella la stessa cartella letta di nuovo.
+    /// Replaces a subfolder with the same folder read again.
     public func replace(folder old: Folder, with new: Folder) {
         guard let parent = old.parent else { return }
         let i = Int(old.index)
@@ -298,10 +298,10 @@ public final class Tree: @unchecked Sendable {
     }
 }
 
-/// un file sul disco: volume e numero (o, per i cloni, il numero del contenuto condiviso)
+/// a file on disk: volume and number (or, for clones, the number of the shared content)
 struct FileKey: Hashable { let dev: Int32; let id: UInt64; let clone: Bool }
 
-/// Le estensioni incontrate (in minuscolo), condivise fra i fili della scansione.
+/// The extensions met (lowercased), shared by the scan's threads.
 public final class ExtensionRegistry: @unchecked Sendable {
     private let state = Mutex<(ids: [String: UInt32], names: [String])>(([:], [""]))
 

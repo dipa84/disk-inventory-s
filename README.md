@@ -1,100 +1,98 @@
 # Disk Inventory S
 
-Che cosa occupa il disco: una mappa a cuscino di ogni file, grande quanto il posto che occupa.
-È Disk Inventory X di Tjark Derlien (gitlab.com/tderlien/disk-inventory-x) riscritto in Swift
-per i Mac di oggi: nativo per Apple Silicon, e molto più veloce. La S sta per Swift.
+What is taking up the disk: a cushion treemap of every file, each as big as the space it takes.
+It is Disk Inventory X by Tjark Derlien (gitlab.com/tderlien/disk-inventory-x) rewritten in Swift
+for today's Macs: native on Apple Silicon, and much faster. The S stands for Swift.
 
-È una versione modificata, non quella dell'autore: riscritta da Riccardo Di Paola nel 2026 (la
-GPL chiede di dirlo). La disposizione e il disegno della mappa vengono da TMVItem.m e
-TMVCushionRenderer.m dell'originale; scansione, modello e interfaccia sono nuovi. Il codice
-interno si chiama ancora `Inventario`, il nome di lavoro.
+This is a modified version, not the author's: rewritten by Riccardo Di Paola in 2026 (the GPL asks
+to say so). The treemap layout and drawing come from the original's TMVItem.m and
+TMVCushionRenderer.m; scanning, model and interface are new.
 
-| | Disk Inventory X (un filo, NSURL) | Disk Inventory S | `du -sk` |
+| | Disk Inventory X (one thread, NSURL) | Disk Inventory S | `du -sk` |
 |---|---|---|---|
-| /Applications, 600 000 file | 158 s | 3,9 s | 21 s |
-| cartella Inizio, 1,2 milioni di file | 723 s | 15,5 s | 103 s |
-| disco intero, 3 milioni di file | — | 34 s | — |
+| /Applications, 600,000 files | 158 s | 3.9 s | 21 s |
+| home folder, 1.2 million files | 723 s | 15.5 s | 103 s |
+| whole disk, 3 million files | — | 34 s | — |
 
-(M1, 8 core; la stessa scansione, a cache calda dove indicato nel registro dei commit.)
+(M1, 8 cores.)
 
-## Che cosa cambia rispetto all'originale
+## What changes from the original
 
-- La scansione legge ogni cartella con `getattrlistbulk` (molte voci per chiamata, con nome, tipo
-  e dimensioni insieme) su tutti i core; somme e ordinamenti si fanno in parallelo man mano che le
-  cartelle finiscono.
-- I collegamenti fissi e i cloni di APFS contano una volta sola: l'originale (e il Finder) contano
-  ogni clone per intero, e su un disco con le copie che Chrome lascia in `/private/var/folders`
-  arrivava a più del triplo del disco.
-- I volumi montati dentro la cartella non si attraversano, i firmlink sì (come l'originale).
-- La mappa è la stessa (TMVItem e TMVCushionRenderer), disegnata a strisce su tutti i core.
+- The scan reads each folder with `getattrlistbulk` (many entries per call, with name, type and
+  sizes together) on all cores; sums and sorting happen in parallel as folders finish.
+- Hard links and APFS clones count only once. The original (and the Finder) count each clone in
+  full: on a disk holding the copies Chrome leaves in `/private/var/folders` it came to more than
+  three times the disk.
+- Volumes mounted inside the folder are not traversed; firmlinks are (as in the original).
+- The treemap is the same (TMVItem and TMVCushionRenderer), drawn in bands on all cores.
 
-## Comandi
+## Commands
 
 | | |
 |---|---|
-| clic | sceglie il file |
-| doppio clic | entra nella cartella sotto il puntatore |
-| ← → ↑ ↓ | il riquadro accanto, allo stesso livello |
-| ⇧ e le frecce | il riquadro accanto, al livello della cartella sopra |
-| ⌘↑ / ⌘↓ | sceglie la cartella sopra / la voce più grande dentro |
-| ↩ | entra nella cartella scelta |
-| ⌘[ / ⌘] / ⇧⌘[ | esce di un livello / torna dentro / tutta la cartella |
-| spazio, ⌘Y | Anteprima |
-| ⌘R | Mostra nel Finder |
-| ⌥⌘C | copia il percorso |
-| ⇧⌘R | rilegge dal disco la cartella scelta |
-| ⌘⌫ | sposta nel Cestino (chiede conferma) |
+| click | selects the file |
+| double click | goes into the folder under the pointer |
+| ← → ↑ ↓ | the neighboring tile, at the same level |
+| ⇧ and the arrows | the neighboring tile, at the level of the folder above |
+| ⌘↑ / ⌘↓ | selects the enclosing folder / the largest entry inside |
+| ↩ | goes into the selected folder |
+| ⌘[ / ⌘] / ⇧⌘[ | goes out one level / back in / the whole folder |
+| space, ⌘Y | Quick Look |
+| ⌘R | Show in Finder |
+| ⌥⌘C | copies the path |
+| ⇧⌘R | rereads the selected folder from disk |
+| ⌘⌫ | moves to the Trash (asks first) |
 
-Scegliere un tipo di file nell'elenco in basso lo mette in evidenza nella mappa.
+Selecting a file kind in the list at the bottom highlights it in the treemap.
 
-## Lo spazio che non è nei file
+## Space that is not in files
 
-Leggendo un disco intero, la mappa mostra anche le voci che non sono file:
+When reading a whole disk, the treemap also shows entries that are not files:
 
-- **Spazio libero**: quello ancora disponibile (lo spazio eliminabile si può aggiungere nelle
-  impostazioni, ma conta due volte i file di iCloud che sono anche nella mappa);
-- **Volumi di sistema**: gli altri volumi dello stesso contenitore APFS (memoria virtuale,
-  Preboot, Recovery, aggiornamenti), misurati uno per uno con `diskutil apfs list`;
-- **Cartelle non lette**: lo spazio delle cartelle che un'app non può aprire. Quelle di sistema
-  (l'indice di Spotlight, le versioni dei documenti, `/private/var/db`…) appartengono a root:
-  il pulsante in fondo alla finestra le fa leggere al programma d'aiuto (`inventario-cli
-  esporta`, dentro l'app) con la password da amministratore, in sola lettura, e le mette nella
-  mappa coi loro nomi. Quelle private (Posta, Messaggi…) chiedono l'Accesso completo al disco;
-- **Dati del file system**: quando si è letto tutto, quello che resta (indici e tabelle di APFS).
+- **Free Space**: what is still available (purgeable space can be added in the settings, but it
+  counts twice the iCloud files that are also in the treemap);
+- **System Volumes**: the other volumes of the same APFS container (virtual memory, Preboot,
+  Recovery, updates), measured one by one with `diskutil apfs list`;
+- **Folders Not Read**: the space of the folders an app cannot open. System ones (the Spotlight
+  index, document versions, `/private/var/db`…) belong to root: the button at the bottom of the
+  window has the helper (`dis-cli export`, inside the app) read them with the administrator
+  password, read-only, and puts them in the treemap with their names. Private ones (Mail,
+  Messages…) need Full Disk Access;
+- **File System Data**: once everything was read, what remains (APFS indexes and tables).
 
-Leggendo «/» si legge anche il volume dei dati (`/System/Volumes/Data`), saltando le cartelle dove
-portano i firmlink, già contate da «/»: ci sono cose che stanno solo lì, come `macOS Install Data`.
+Reading “/” also reads the data volume (`/System/Volumes/Data`), skipping the folders the firmlinks
+lead to, already counted from “/”: some things live only there, like `macOS Install Data`.
 
-L'originale metteva tutto questo in un «Other space».
+The original put all of this into a single “Other space”.
 
-## Impostazioni (⌘,)
+## Settings (⌘,)
 
-Generale (dimensione, unità decimali o binarie, conferma del Cestino, che cosa aprire all'avvio,
-lingua), Mappa (rilievo e luce dei cuscini, righe fra i file, bordo sotto il puntatore, 12 o 24
-tipi colorati), Scansione (cloni e collegamenti fissi una volta sola, altri volumi, pacchetti,
-cartelle da saltare), Spazio.
+General (size, decimal or binary units, Trash confirmation, what to open at launch, language),
+Map (cushion relief and light, lines between files, frame under the pointer, 12 or 24 colored
+kinds), Scan (clones and hard links once, other volumes, packages, folders to skip), Space.
 
-## Lingue
+## Languages
 
-Italiano, inglese, spagnolo, francese, tedesco, cinese semplificato, giapponese. Le frasi stanno
-in `tools/traduzioni.py`, che genera i file `.strings` e si ferma se nel codice c'è una frase
-passata a `L()` senza traduzione. I nomi dei tipi di file li dà macOS, nella lingua dell'app.
+English, Italian, Spanish, French, German, Simplified Chinese, Japanese. The strings live in
+`tools/translations.py`, which writes the `.strings` files and stops if the code passes a string to
+`L()` without a translation. File kind names come from macOS, in the app's language.
 
-## Costruire
+## Building
 
-Bastano gli strumenti da riga di comando (Swift 6), non serve Xcode.
+The command line tools (Swift 6) are enough; Xcode is not needed.
 
-    tools/inventario-app.sh             # .build/Disk Inventory S.app
-    tools/inventario-app.sh --installa  # anche in /Applications
-    swift run -c release inventario-prove
-    swift run -c release inventario-cli scan ~      # i tempi della scansione
+    tools/make-certificate.sh          # once per Mac: a local signing certificate
+    tools/build-app.sh                 # .build/Disk Inventory S.app
+    tools/build-app.sh --install       # also into /Applications
+    swift run -c release dis-tests
+    swift run -c release dis-cli scan ~    # scan timings
 
-`INVENTARIO_MISURA=1` stampa i tempi di scansione e disegno; `INVENTARIO_FOTO=file.png` salva
-un'immagine della finestra dopo la scansione ed esce.
+The local certificate keeps macOS privacy permissions from one build to the next: signed ad hoc,
+every build looks like a new app to macOS, which asks for them again.
 
-Per leggere anche Mail, Messaggi, Safari e le altre cartelle protette, Disk Inventory S ha bisogno
-dell'Accesso completo al disco (Impostazioni di Sistema › Privacy e sicurezza).
+`DIS_TIMING=1` prints scan and drawing times; `DIS_PHOTO=file.png` saves an image of the window
+after the scan and quits (`DIS_ACTIONS=selectChild,zoomIn` runs menu actions first).
 
-## Licenza
+## License
 
-GPL 3, come Disk Inventory X (COPYING).
+GPL 3, like Disk Inventory X (COPYING).

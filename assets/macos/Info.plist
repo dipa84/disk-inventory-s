@@ -9,15 +9,15 @@
 	<key>CFBundleIdentifier</key>
 	<string>it.dipaola.diskinventorys</string>
 	<key>CFBundleExecutable</key>
-	<string>Inventario</string>
+	<string>DiskInventoryS</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>@VERSIONE@</string>
+	<string>@VERSION@</string>
 	<key>CFBundleVersion</key>
-	<string>@VERSIONE@</string>
+	<string>@VERSION@</string>
 	<key>CFBundleIconFile</key>
-	<string>Inventario</string>
+	<string>DiskInventoryS</string>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleLocalizations</key>
@@ -37,12 +37,12 @@
 	<key>NSHighResolutionCapable</key>
 	<true/>
 	<key>NSHumanReadableCopyright</key>
-	<string>Riscritto in Swift da Riccardo Di Paola (2026) a partire da Disk Inventory X di Tjark Derlien (2003–2022). GPL 3.</string>
+	<string>Rewritten in Swift by Riccardo Di Paola (2026) from Disk Inventory X by Tjark Derlien (2003–2022). GPL 3.</string>
 	<key>CFBundleDocumentTypes</key>
 	<array>
 		<dict>
 			<key>CFBundleTypeName</key>
-			<string>Cartella</string>
+			<string>Folder</string>
 			<key>CFBundleTypeRole</key>
 			<string>Viewer</string>
 			<key>LSHandlerRank</key>

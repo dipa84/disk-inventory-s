@@ -1,13 +1,13 @@
 import Foundation
 
-/// Cartelle lette altrove (dal programma d'aiuto con i permessi da amministratore) e passate
-/// all'app in un file: un formato binario semplice, cartella per cartella in profondità.
+/// Folders read elsewhere (by the helper, with administrator rights) and handed to the app in a
+/// file: a simple binary format, folder by folder, depth first.
 ///
-///     file     = n:u32, n × (percorso, cartella)
-///     percorso = lunghezza:u32, byte UTF-8
-///     cartella = stato:u8 (1 non leggibile, 2 altro volume), voci:u32, voci × voce
-///     voce     = flags:u16, alloc:u64, logical:u64, nome (lunghezza:u16, byte),
-///                e subito dopo la sua cartella, se è una cartella letta
+///     file   = n:u32, n × (path, folder)
+///     path   = length:u32, UTF-8 bytes
+///     folder = state:u8 (1 unreadable, 2 another volume), entries:u32, entries × entry
+///     entry  = flags:u16, alloc:u64, logical:u64, name (length:u16, bytes),
+///              followed by its folder, if it is a folder that was read
 public enum FolderExport {
     public static func write(_ folders: [(path: String, folder: Folder)]) -> Data {
         var out = Data()
@@ -36,7 +36,7 @@ public enum FolderExport {
         }
     }
 
-    /// Le cartelle, per percorso, già sommate e ordinate; nil se il file è rovinato.
+    /// The folders by path, already summed and sorted; nil if the file is damaged.
     public static func read(_ data: Data, registry: ExtensionRegistry, mode: SizeMode) -> [String: Folder]? {
         var r = Reader(data: data)
         var cache = ExtensionCache()
@@ -62,8 +62,8 @@ public enum FolderExport {
             var e = Entry(alloc: alloc, logical: logical, nameStart: 0, ext: 0, sub: -1, nameLen: 0,
                           flags: Entry.Flags(rawValue: flags))
             name.withUnsafeBytes { e.ext = cache.ext(of: $0, registry) }
-            // la cartella arriva subito dopo la sua voce, tranne per quelle che la scansione non
-            // apre mai (altri volumi, saltate, firmlink): sono le uniche con `sub` < 0
+            // the folder comes right after its entry, except for those the scan never opens
+            // (other volumes, skipped, firmlinks): they are the only ones with `sub` < 0
             if e.isDirectory && e.flags.isDisjoint(with: [.mountPoint, .skipped, .firmlinked]) {
                 guard let sub = read(&r, parent: f, index: Int32(f.entries.count), &cache, registry, mode) else { return nil }
                 e.sub = Int32(f.subfolders.count)

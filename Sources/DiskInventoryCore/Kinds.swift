@@ -1,9 +1,9 @@
 import Foundation
 import UniformTypeIdentifiers
 
-/// I tipi di file di un albero («Immagine JPEG», «Applicazione», …), con quanto occupano e il
-/// colore nella mappa. Il tipo si ricava dall'estensione, una volta per estensione: durante la
-/// scansione non si chiede nulla al sistema.
+/// The file kinds of a tree (“JPEG image”, “Application”, …), with how much they take and their
+/// color in the map. The kind comes from the extension, once per extension: the scan never asks
+/// the system anything.
 public final class Kinds {
     public struct Kind {
         public let name: String
@@ -17,12 +17,12 @@ public final class Kinds {
     }
 
     public private(set) var kinds: [Kind] = []
-    /// per estensione: il tipo di un file, e quello di una cartella (-1 se non è un pacchetto)
+    /// per extension: the kind of a file, and that of a folder (-1 if it is not a package)
     private var fileKind: [Int32] = []
     private var packageKind: [Int32] = []
     private var byName: [String: Int32] = [:]
     private var folderKind: Int32 = 0, symlinkKind: Int32 = 0, executableKind: Int32 = 0, documentKind: Int32 = 0
-    /// i tipi delle voci dello spazio (libero, volumi di sistema, nascosto)
+    /// the kinds of the space entries (free, system volumes, not read, file system)
     private var spaceKinds: [Tree.Space: Int32] = [:]
 
     public init(extensions: [String]) {
@@ -37,7 +37,7 @@ public final class Kinds {
             if let t = UTType(filenameExtension: ext), t.localizedDescription != nil, !t.isDynamic {
                 fileKind[id] = add(t)
             } else {
-                fileKind[id] = add(name: L("File .%@", ext), type: nil)
+                fileKind[id] = add(name: L(".%@ File", ext), type: nil)
             }
             if let t = UTType(filenameExtension: ext, conformingTo: .directory), t.conforms(to: .package), !t.isDynamic {
                 packageKind[id] = add(t)
@@ -59,7 +59,7 @@ public final class Kinds {
 
     public var folderKindIndex: Int { Int(folderKind) }
 
-    /// è uno dei tipi dello spazio (libero, volumi di sistema, nascosto)?
+    /// is it one of the space kinds (free, system volumes, not read, file system)?
     public func isSpace(_ k: Int) -> Bool { spaceKinds.values.contains(Int32(k)) }
 
     public func isPackage(_ e: Entry) -> Bool {
@@ -77,8 +77,8 @@ public final class Kinds {
         return Int(fileKind[Int(e.ext)])
     }
 
-    /// Conta quanto occupa ogni tipo sotto `folder` e dà i colori ai dodici tipi più grandi.
-    /// I pacchetti chiusi contano come un oggetto solo del loro tipo.
+    /// Adds up how much each kind takes under `folder` and gives colors to the largest kinds.
+    /// Closed packages count as a single item of their kind.
     public func tally(_ folder: Folder, mode: SizeMode, openPackages: Bool, colored: Int = 12) {
         for i in kinds.indices {
             kinds[i].alloc = 0
@@ -99,7 +99,7 @@ public final class Kinds {
                 kinds[k].count += 1
             }
         }
-        // i colori ai tipi veri; lo spazio libero chiaro, l'altro scuro
+        // colors for the real kinds; free space light, the rest dark
         let spaces = Set(spaceKinds.values.map(Int.init))
         let order = kinds.indices.filter { !spaces.contains($0) }.sorted { kinds[$0].size(mode) > kinds[$1].size(mode) }
         let palette = Palette.colors(colored)
@@ -112,7 +112,7 @@ public final class Kinds {
         kinds[Int(spaceKinds[.filesystem]!)].color = [0.25, 0.25, 0.25]
     }
 
-    /// i tipi presenti, dal più grande
+    /// the kinds present, largest first
     public func ranked(_ mode: SizeMode) -> [Int] {
         kinds.indices.filter { kinds[$0].count > 0 }.sorted { kinds[$0].size(mode) > kinds[$1].size(mode) }
     }

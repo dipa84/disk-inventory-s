@@ -1,10 +1,10 @@
 import Foundation
-import InventarioCore
+import DiskInventoryCore
 
-/// Le preferenze, in UserDefaults. Chi le cambia manda `Prefs.changed`: le finestre aperte si
-/// ridisegnano (la mappa, le unità) o lo applicano alla prossima lettura (la scansione).
+/// The settings, in UserDefaults. Whoever changes them posts `Prefs.changed`: open windows
+/// redraw (map, units) or apply it at the next scan (scan options).
 enum Prefs {
-    static let changed = Notification.Name("PreferenzeCambiate")
+    static let changed = Notification.Name("SettingsChanged")
 
     private static var d: UserDefaults { .standard }
 
@@ -29,27 +29,27 @@ enum Prefs {
     }
 
     enum Key {
-        static let logicalSize = "dimensioneLogica"
-        static let binaryUnits = "unitaBinarie"
-        static let confirmTrash = "confermaCestino"
-        static let atLaunch = "allAvvio"
-        static let lastFolder = "ultimaCartella"
-        static let cushionHeight = "altezzaCuscini"
-        static let ambientLight = "luceAmbiente"
-        static let hoverFrame = "bordoSottoPuntatore"
-        static let coloredKinds = "tipiColorati"
-        static let edges = "bordiFraFile"
-        static let countSharedOnce = "condivisiUnaVolta"
-        static let crossVolumes = "attraversaVolumi"
-        static let skipNames = "cartelleDaSaltare"
-        static let openPackages = "pacchettiAperti"
-        static let showSpace = "mostraSpazio"
-        static let purgeableIsFree = "eliminabileLibero"
+        static let logicalSize = "logicalSize"
+        static let binaryUnits = "binaryUnits"
+        static let confirmTrash = "confirmTrash"
+        static let atLaunch = "atLaunch"
+        static let lastFolder = "lastFolder"
+        static let cushionHeight = "cushionHeight"
+        static let ambientLight = "ambientLight"
+        static let hoverFrame = "hoverFrame"
+        static let coloredKinds = "coloredKinds"
+        static let edges = "edges"
+        static let countSharedOnce = "countSharedOnce"
+        static let crossVolumes = "crossVolumes"
+        static let skipNames = "skipNames"
+        static let openPackages = "openPackages"
+        static let showSpace = "showSpace"
+        static let purgeableIsFree = "purgeableIsFree"
     }
 
     enum Launch: String { case disks, lastFolder, nothing }
 
-    // generale
+    // general
     static var logicalSize: Bool { d.bool(forKey: Key.logicalSize) }
     static var binaryUnits: Bool { d.bool(forKey: Key.binaryUnits) }
     static var confirmTrash: Bool { d.bool(forKey: Key.confirmTrash) }
@@ -59,14 +59,14 @@ enum Prefs {
         set { d.set(newValue, forKey: Key.lastFolder) }
     }
 
-    // mappa
+    // map
     static var cushionHeight: Double { d.double(forKey: Key.cushionHeight) }
     static var ambientLight: Double { d.double(forKey: Key.ambientLight) }
     static var hoverFrame: Bool { d.bool(forKey: Key.hoverFrame) }
     static var coloredKinds: Int { d.integer(forKey: Key.coloredKinds) }
     static var edges: Bool { d.bool(forKey: Key.edges) }
 
-    // scansione
+    // scan
     static var scanOptions: ScanOptions {
         let names = d.string(forKey: Key.skipNames) ?? ""
         let skip = Set(names.split(whereSeparator: { $0 == "," || $0 == "\n" }).map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty })
@@ -74,7 +74,7 @@ enum Prefs {
     }
     static var openPackages: Bool { d.bool(forKey: Key.openPackages) }
 
-    // spazio
+    // space
     static var showSpace: Bool { d.bool(forKey: Key.showSpace) }
     static var purgeableIsFree: Bool { d.bool(forKey: Key.purgeableIsFree) }
 }

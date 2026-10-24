@@ -1,21 +1,21 @@
 import Foundation
-import InventarioCore
+import DiskInventoryCore
 
-/// Lo spazio di un volume, per le voci che non sono file: quanto è grande, quanto è libero,
-/// quanto occupano gli altri volumi dello stesso contenitore APFS (memoria virtuale, Preboot,
-/// Recovery, aggiornamenti). Si misura una volta, alla fine della scansione.
+/// A volume's space, for the entries that are not files: how big it is, how much is free,
+/// how much the other volumes of the same APFS container take (virtual memory, Preboot,
+/// Recovery, updates). Measured once, at the end of the scan.
 struct VolumeSpace {
-    /// il contenitore APFS intero (o il volume, se non è APFS)
+    /// the whole APFS container (or the volume, if not APFS)
     let total: UInt64
-    /// libero davvero
+    /// really free
     let free: UInt64
-    /// in più, quello che il sistema libera da sé quando serve (cache, copie di iCloud): il
-    /// Finder lo conta come disponibile
+    /// on top, what the system frees by itself when needed (caches, iCloud copies): the Finder
+    /// counts it as available
     let purgeable: UInt64
-    /// gli altri volumi del contenitore; nil se non si sa (non APFS)
+    /// the container's other volumes; nil if unknown (not APFS)
     let system: UInt64?
 
-    /// nil se `root` non è un volume intero
+    /// nil if `root` is not a whole volume
     static func measure(_ root: String) -> VolumeSpace? {
         var fs = statfs()
         guard statfs(root, &fs) == 0 else { return nil }
@@ -39,8 +39,8 @@ struct VolumeSpace {
         return VolumeSpace(total: total, free: free, purgeable: purgeable, system: system)
     }
 
-    /// Da `diskutil apfs list`: il contenitore del volume e quanto occupano gli altri volumi.
-    /// Leggendo «/» si leggono due volumi, Sistema e Dati (uniti dai firmlink).
+    /// From `diskutil apfs list`: the volume's container and how much the other volumes take.
+    /// Reading “/” reads two volumes, System and Data (joined by firmlinks).
     private static func apfsContainer(device: String, root: String) -> (total: UInt64, free: UInt64, others: UInt64)? {
         let p = Process()
         p.executableURL = URL(fileURLWithPath: "/usr/sbin/diskutil")
@@ -53,7 +53,7 @@ struct VolumeSpace {
         p.waitUntilExit()
         guard let plist = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any],
               let containers = plist["Containers"] as? [[String: Any]] else { return nil }
-        // /dev/disk3s3s1 è un'istantanea del volume disk3s3
+        // /dev/disk3s3s1 is a snapshot of volume disk3s3
         let dev = device.hasPrefix("/dev/") ? String(device.dropFirst(5)) : device
         for c in containers {
             let volumes = c["Volumes"] as? [[String: Any]] ?? []
@@ -76,8 +76,8 @@ struct VolumeSpace {
         return nil
     }
 
-    /// Le voci da mettere nella mappa, dato quanto ha contato la scansione.
-    /// `unread`: ci sono cartelle non lette (allora il resto è loro, più i dati del file system)
+    /// The entries to put in the map, given how much the scan counted.
+    /// `unread`: there are folders not read (then the rest is theirs, plus the file system data)
     func spaces(counted: UInt64, includePurgeable: Bool, unread: Bool) -> [(Tree.Space, UInt64)] {
         let free = includePurgeable ? self.free + purgeable : self.free
         let system = self.system ?? 0

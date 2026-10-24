@@ -2,17 +2,17 @@
 import PackageDescription
 
 let package = Package(
-    name: "Inventario",
+    name: "DiskInventoryS",
     platforms: [.macOS(.v15)],
     targets: [
-        // la scansione, l'albero, i tipi di file e la mappa: niente interfaccia
-        .target(name: "InventarioCore"),
-        // la finestra (AppKit)
-        .executableTarget(name: "Inventario", dependencies: ["InventarioCore"]),
-        // misure da terminale: scansione e disegno con i tempi
-        .executableTarget(name: "inventario-cli", dependencies: ["InventarioCore"]),
-        // le prove: senza Xcode il framework Testing non gira, quindi un eseguibile
-        .executableTarget(name: "inventario-prove", dependencies: ["InventarioCore"]),
+        // scanning, the tree, file kinds and the treemap: no user interface
+        .target(name: "DiskInventoryCore"),
+        // the app (AppKit)
+        .executableTarget(name: "DiskInventoryS", dependencies: ["DiskInventoryCore"]),
+        // command line: timings, the icon, and the helper that reads system folders as root
+        .executableTarget(name: "dis-cli", dependencies: ["DiskInventoryCore"]),
+        // the tests: without Xcode the Testing framework does not run them, hence an executable
+        .executableTarget(name: "dis-tests", dependencies: ["DiskInventoryCore"]),
     ],
     swiftLanguageModes: [.v5]
 )

@@ -1,6 +1,6 @@
 #!/bin/zsh
 # Creates, once per Mac, a self-signed code signing certificate in the login keychain, so that
-# tools/inventario-app.sh can sign every build with the same identity and macOS keeps the privacy
+# tools/build-app.sh can sign every build with the same identity and macOS keeps the privacy
 # permissions (Full Disk Access, Desktop, Documents…) from one build to the next.
 # No Apple developer account needed; the app can be shared only after re-signing with Developer ID.
 #

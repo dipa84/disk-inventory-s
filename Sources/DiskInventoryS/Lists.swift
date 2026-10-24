@@ -1,20 +1,20 @@
 import AppKit
-import InventarioCore
+import DiskInventoryCore
 import UniformTypeIdentifiers
 
-// MARK: l'elenco delle cartelle
+// MARK: the folder list
 
 final class OutlineItem: NSObject {
     let item: Item
     init(_ item: Item) { self.item = item }
 }
 
-/// Le cartelle in ordine di grandezza, come nel Finder ma con le dimensioni di tutto.
+/// Folders sorted by size, like the Finder but with the size of everything.
 final class OutlineController: NSObject, NSOutlineViewDataSource, NSOutlineViewDelegate {
     weak var controller: DocumentController?
     let scrollView = NSScrollView()
     private let view = KeyOutlineView()
-    /// le righe di ogni cartella, fatte la prima volta che si apre
+    /// each folder's rows, made the first time it is opened
     private var children: [ObjectIdentifier: [OutlineItem]] = [:]
     private var root: OutlineItem?
     private var revealing = false
@@ -23,17 +23,17 @@ final class OutlineController: NSObject, NSOutlineViewDataSource, NSOutlineViewD
 
     override init() {
         super.init()
-        let name = NSTableColumn(identifier: .init("nome"))
-        name.title = L("Nome")
+        let name = NSTableColumn(identifier: .init("name"))
+        name.title = L("Name")
         name.width = 220
-        let size = NSTableColumn(identifier: .init("dimensione"))
-        size.title = L("Dimensione")
+        let size = NSTableColumn(identifier: .init("size"))
+        size.title = L("Size")
         size.width = 80
-        let share = NSTableColumn(identifier: .init("quota"))
+        let share = NSTableColumn(identifier: .init("share"))
         share.title = "%"
         share.width = 58
-        let kind = NSTableColumn(identifier: .init("tipo"))
-        kind.title = L("Tipo")
+        let kind = NSTableColumn(identifier: .init("kind"))
+        kind.title = L("Kind")
         kind.width = 120
         for c in [name, size, share, kind] { view.addTableColumn(c) }
         view.outlineTableColumn = name
@@ -42,7 +42,7 @@ final class OutlineController: NSObject, NSOutlineViewDataSource, NSOutlineViewD
         view.style = .inset
         view.usesAlternatingRowBackgroundColors = false
         view.allowsMultipleSelection = false
-        view.autosaveName = "Inventario.cartelle"
+        view.autosaveName = "DiskInventoryS.folders"
         view.autosaveTableColumns = true
         view.target = self
         view.doubleAction = #selector(doubleClicked)
@@ -92,16 +92,16 @@ final class OutlineController: NSObject, NSOutlineViewDataSource, NSOutlineViewD
         let cell = (outlineView.makeView(withIdentifier: id, owner: self) as? NSTableCellView) ?? makeCell(id)
         let it = o.item
         switch id.rawValue {
-        case "nome":
+        case "name":
             cell.textField?.stringValue = doc.name(it)
             cell.imageView?.image = icon(it, doc)
             let e = it.entryValue
             let dim = e.map { !$0.flags.isDisjoint(with: [.hardlinkSeen, .cloneSeen, .mountPoint, .skipped, .special, .firmlinked]) } == true
             cell.textField?.textColor = e?.flags.contains(.unreadable) == true ? .systemRed : dim ? .secondaryLabelColor : .labelColor
             cell.toolTip = tip(e)
-        case "dimensione":
+        case "size":
             cell.textField?.stringValue = Format.size(it.size(doc.mode))
-        case "quota":
+        case "share":
             let whole = it.isRoot ? it.size(doc.mode) : it.folder.size(doc.mode)
             cell.textField?.stringValue = Format.percent(it.size(doc.mode), of: whole)
         default:
@@ -123,7 +123,7 @@ final class OutlineController: NSObject, NSOutlineViewDataSource, NSOutlineViewD
         text.translatesAutoresizingMaskIntoConstraints = false
         cell.addSubview(text)
         cell.textField = text
-        if id.rawValue == "nome" {
+        if id.rawValue == "name" {
             let image = NSImageView()
             image.translatesAutoresizingMaskIntoConstraints = false
             cell.addSubview(image)
@@ -138,11 +138,11 @@ final class OutlineController: NSObject, NSOutlineViewDataSource, NSOutlineViewD
         } else {
             text.leadingAnchor.constraint(equalTo: cell.leadingAnchor).isActive = true
         }
-        if id.rawValue == "dimensione" || id.rawValue == "quota" {
+        if id.rawValue == "size" || id.rawValue == "share" {
             text.alignment = .right
             text.font = .monospacedDigitSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
         }
-        if id.rawValue == "tipo" { text.textColor = .secondaryLabelColor }
+        if id.rawValue == "kind" { text.textColor = .secondaryLabelColor }
         NSLayoutConstraint.activate([
             text.trailingAnchor.constraint(equalTo: cell.trailingAnchor),
             text.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
@@ -160,7 +160,7 @@ final class OutlineController: NSObject, NSOutlineViewDataSource, NSOutlineViewD
             return NSImage(systemSymbolName: symbol, accessibilityDescription: nil) ?? NSImage()
         }
         if let e = it.entryValue, doc.kinds.isPackage(e) {
-            // i pacchetti (le applicazioni) hanno ognuno la sua icona
+            // packages (apps) each have their own icon
             let path = doc.path(it)
             if let i = packageIcons[path] { return i }
             let i = NSWorkspace.shared.icon(forFile: path)
@@ -186,7 +186,7 @@ final class OutlineController: NSObject, NSOutlineViewDataSource, NSOutlineViewD
         }
     }
 
-    /// apre le cartelle fino alla voce e la sceglie
+    /// opens the folders down to the entry and selects it
     func reveal(_ item: Item?) {
         guard let item, item.isValid, let root else {
             view.deselectAll(nil)
@@ -221,7 +221,7 @@ final class OutlineController: NSObject, NSOutlineViewDataSource, NSOutlineViewD
     }
 }
 
-/// lo spazio apre l'Anteprima, il clic destro il menu della scelta
+/// space opens Quick Look, right click the selection's menu
 final class KeyOutlineView: NSOutlineView {
     weak var owner: OutlineController?
 
@@ -240,10 +240,10 @@ final class KeyOutlineView: NSOutlineView {
     }
 }
 
-// MARK: i tipi di file
+// MARK: the file kinds
 
-/// I tipi di file dal più grande, col loro colore nella mappa. Sceglierne uno lo mette in
-/// evidenza nella mappa; sceglierlo di nuovo (o il vuoto) lo toglie.
+/// File kinds, largest first, with their color in the map. Selecting one highlights it in the
+/// map; selecting it again (or the empty area) removes the highlight.
 final class KindsController: NSObject, NSTableViewDataSource, NSTableViewDelegate {
     weak var controller: DocumentController?
     let scrollView = NSScrollView()
@@ -252,21 +252,21 @@ final class KindsController: NSObject, NSTableViewDataSource, NSTableViewDelegat
 
     override init() {
         super.init()
-        let name = NSTableColumn(identifier: .init("tipo"))
-        name.title = L("Tipo")
+        let name = NSTableColumn(identifier: .init("kind"))
+        name.title = L("Kind")
         name.width = 200
-        let size = NSTableColumn(identifier: .init("dimensione"))
-        size.title = L("Dimensione")
+        let size = NSTableColumn(identifier: .init("size"))
+        size.title = L("Size")
         size.width = 80
-        let count = NSTableColumn(identifier: .init("file"))
-        count.title = L("File")
+        let count = NSTableColumn(identifier: .init("files"))
+        count.title = L("Files")
         count.width = 70
         for c in [name, size, count] { table.addTableColumn(c) }
         table.dataSource = self
         table.delegate = self
         table.style = .inset
         table.allowsEmptySelection = true
-        table.autosaveName = "Inventario.tipi"
+        table.autosaveName = "DiskInventoryS.kinds"
         table.autosaveTableColumns = true
         scrollView.documentView = table
         scrollView.hasVerticalScroller = true
@@ -289,10 +289,10 @@ final class KindsController: NSObject, NSTableViewDataSource, NSTableViewDelegat
         let k = doc.kinds.kinds[ranked[row]]
         let cell = (tableView.makeView(withIdentifier: id, owner: self) as? NSTableCellView) ?? makeCell(id)
         switch id.rawValue {
-        case "tipo":
+        case "kind":
             cell.textField?.stringValue = k.name
             cell.imageView?.image = swatch(k.color)
-        case "dimensione":
+        case "size":
             cell.textField?.stringValue = Format.size(k.size(doc.mode))
         default:
             cell.textField?.stringValue = doc.kinds.isSpace(ranked[row]) ? "" : Format.count(k.count)
@@ -308,7 +308,7 @@ final class KindsController: NSObject, NSTableViewDataSource, NSTableViewDelegat
         text.translatesAutoresizingMaskIntoConstraints = false
         cell.addSubview(text)
         cell.textField = text
-        if id.rawValue == "tipo" {
+        if id.rawValue == "kind" {
             let image = NSImageView()
             image.translatesAutoresizingMaskIntoConstraints = false
             cell.addSubview(image)
@@ -332,7 +332,7 @@ final class KindsController: NSObject, NSTableViewDataSource, NSTableViewDelegat
         return cell
     }
 
-    /// un quadratino a cuscino del colore del tipo, come nella mappa
+    /// a small cushion square in the kind's color, as in the map
     private func swatch(_ c: SIMD3<Double>) -> NSImage {
         let color = NSColor(srgbRed: c.x, green: c.y, blue: c.z, alpha: 1)
         return NSImage(size: NSSize(width: 14, height: 14), flipped: false) { r in

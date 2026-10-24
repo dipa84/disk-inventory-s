@@ -1,15 +1,15 @@
 import AppKit
-import InventarioCore
+import DiskInventoryCore
 
-/// Una cosa che si può scegliere: una voce di una cartella, oppure (entry -1) la cartella di
-/// partenza, che non ha una voce sopra di sé.
+/// Something that can be selected: an entry of a folder, or (entry -1) the starting folder,
+/// which has no entry above it.
 struct Item: Equatable {
     unowned(unsafe) let folder: Folder
     let entry: Int
 
     static func == (a: Item, b: Item) -> Bool { a.folder === b.folder && a.entry == b.entry }
 
-    /// la voce che rappresenta una cartella
+    /// the entry representing a folder
     init(_ folder: Folder) {
         if let p = folder.parent {
             self.folder = p
@@ -28,7 +28,7 @@ struct Item: Equatable {
     var isRoot: Bool { entry < 0 }
     var entryValue: Entry? { entry >= 0 && entry < folder.entries.count ? folder.entries[entry] : nil }
 
-    /// la cartella che questa voce è, se è una cartella letta
+    /// the folder this entry is, if it is a folder that was read
     var contents: Folder? { entry < 0 ? folder : folder.subfolder(at: entry) }
 
     var parent: Item? {
@@ -40,23 +40,23 @@ struct Item: Equatable {
         entry < 0 ? folder.size(mode) : folder.entries[entry].size(mode)
     }
 
-    /// è ancora nell'albero? (dopo Cestino e Aggiorna le posizioni cambiano)
+    /// is it still in the tree? (positions change after Trash and Refresh)
     var isValid: Bool { entry < 0 || entry < folder.entries.count }
 }
 
-/// Tutto quello che una finestra sa di una scansione.
+/// Everything a window knows about a scan.
 final class Document {
     let tree: Tree
     let kinds: Kinds
     var openPackages = Prefs.openPackages
-    /// lo spazio del volume, quando la cartella di partenza è un volume intero
+    /// the volume's space, when the starting folder is a whole volume
     let space: VolumeSpace?
-    /// quanto ha contato la scansione: il resto dello spazio usato è nascosto
+    /// how much the scan counted: the rest of the used space was not seen
     private let counted: UInt64
-    /// le cartelle che non si sono lasciate leggere (permessi di sistema o privacy)
+    /// the folders that could not be read (system permissions or privacy)
     let unreadFolders: [Folder]
     var isVolume: Bool { space != nil }
-    /// la tipologia scelta nell'elenco dei tipi: la mappa la mette in evidenza
+    /// the kind selected in the kinds list: the map highlights it
     var highlightedKind: Int?
 
     init(tree: Tree, space: VolumeSpace?) {
@@ -76,8 +76,8 @@ final class Document {
         tally()
     }
 
-    /// Rifà le voci dello spazio (dopo le preferenze). Restano quelle misurate alla lettura:
-    /// il Cestino non libera spazio finché non si svuota.
+    /// Redoes the space entries (after the settings change). They stay as measured at scan time:
+    /// the Trash frees no space until it is emptied.
     func updateSpecialSpace() {
         guard let space, Prefs.showSpace else {
             tree.setSpecialSpace([])
@@ -88,22 +88,22 @@ final class Document {
 
     func isSpecial(_ item: Item) -> Bool { item.entryValue?.flags.contains(.special) == true }
 
-    /// che cosa vuol dire una voce particolare (per la barra in basso e i suggerimenti)
+    /// what a special entry means (for the status bar and tooltips)
     static func note(_ e: Entry) -> String? {
         if e.flags.contains(.special) {
             switch Tree.Space(rawValue: e.ext) {
-            case .free?: return L("lo spazio ancora disponibile")
-            case .system?: return L("memoria virtuale, Preboot, Recovery, aggiornamenti di macOS")
-            case .filesystem?: return L("gli indici e le tabelle del file system")
-            default: return L("lo spazio delle cartelle che non si sono lasciate leggere")
+            case .free?: return L("the space still available")
+            case .system?: return L("virtual memory, Preboot, Recovery, macOS updates")
+            case .filesystem?: return L("the file system’s indexes and tables")
+            default: return L("the space of the folders that couldn’t be read")
             }
         }
-        if e.flags.contains(.unreadable) { return L("non leggibile: serve l'Accesso completo al disco") }
-        if e.flags.contains(.mountPoint) { return L("un altro volume: non è contato qui") }
-        if e.flags.contains(.firmlinked) { return L("è la stessa cartella che si vede da / (firmlink): contata là") }
-        if e.flags.contains(.skipped) { return L("saltata (Impostazioni › Scansione)") }
-        if e.flags.contains(.hardlinkSeen) { return L("un altro nome di un file già contato altrove") }
-        if e.flags.contains(.cloneSeen) { return L("un clone: conta solo quello che ha di suo") }
+        if e.flags.contains(.unreadable) { return L("unreadable: needs Full Disk Access") }
+        if e.flags.contains(.mountPoint) { return L("another volume: not counted here") }
+        if e.flags.contains(.firmlinked) { return L("the same folder seen from / (firmlink): counted there") }
+        if e.flags.contains(.skipped) { return L("skipped (Settings › Scan)") }
+        if e.flags.contains(.hardlinkSeen) { return L("another name of a file already counted elsewhere") }
+        if e.flags.contains(.cloneSeen) { return L("a clone: only its own data counts") }
         return nil
     }
 
@@ -126,12 +126,12 @@ final class Document {
         return kinds.kinds[kinds.kind(of: e)].name
     }
 
-    /// nella mappa: si divide in riquadri o si disegna intera?
+    /// in the map: is it divided into tiles or drawn whole?
     func isLeaf(_ e: Entry) -> Bool {
         !e.isDirectory || (!openPackages && kinds.isPackage(e))
     }
 
-    /// si può entrare (zoom, figli nell'elenco)? I pacchetti solo se li apriamo.
+    /// can one go into it (zoom, children in the list)? Packages only if we open them.
     func isContainer(_ item: Item) -> Bool {
         guard let e = item.entryValue else { return true }
         return e.sub >= 0 && !isLeaf(e)

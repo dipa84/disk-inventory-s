@@ -1,15 +1,17 @@
 import CoreGraphics
 import Foundation
 import ImageIO
-import InventarioCore
+import DiskInventoryCore
 
-// uso: inventario-cli scan <cartella> [--fili N]   la scansione nuova, con i tempi
-//      inventario-cli originale <cartella>          come la fa Disk Inventory X (un filo, NSURL)
-//      inventario-cli mappa <cartella> <file.png> [LxA]   la mappa in un'immagine, con i tempi
-//      inventario-cli icona <cartella.iconset>     l'icona: una piccola mappa a cuscino
-//      inventario-cli esporta <elenco> <uscita>     legge le cartelle dell'elenco (una per riga) e
-//                                                   le scrive per l'app: è il programma d'aiuto che
-//                                                   l'app lancia con la password da amministratore
+// usage: dis-cli scan <folder> [--threads N]        the new scan, with timings
+//        dis-cli original <folder>                  the way Disk Inventory X scans (one thread, NSURL)
+//        dis-cli largest <folder>                   the largest entries, three levels deep
+//        dis-cli unreadable <folder>                the folders that cannot be read
+//        dis-cli map <folder> <file.png> [WxH]      the treemap as an image, with timings
+//        dis-cli icon <folder.iconset>              the app icon: a small cushion treemap
+//        dis-cli export <list> <output>             reads the folders in the list (one per line)
+//                                                   and writes them for the app: the helper the
+//                                                   app runs with the administrator password
 
 func seconds(_ start: ContinuousClock.Instant) -> String {
     let d = ContinuousClock.now - start
@@ -21,26 +23,26 @@ func gb(_ bytes: UInt64) -> String { String(format: "%.2f GB", Double(bytes) / 1
 
 let args = CommandLine.arguments
 guard args.count >= 3 else {
-    print("uso: inventario-cli scan|originale <cartella> [--fili N]")
+    print("usage: dis-cli scan|original|largest|unreadable|map|icon|export … (see the source)")
     exit(2)
 }
 let path = args[2]
 var threads = 0
-if let i = args.firstIndex(of: "--fili"), i + 1 < args.count { threads = Int(args[i + 1]) ?? 0 }
+if let i = args.firstIndex(of: "--threads"), i + 1 < args.count { threads = Int(args[i + 1]) ?? 0 }
 
 switch args[1] {
 case "scan":
     let start = ContinuousClock.now
     let scanner = DiskScanner(threads: threads)
     guard let tree = scanner.scan(path) else {
-        print("non riesco a leggere \(path)")
+        print("cannot read \(path)")
         exit(1)
     }
-    print("\(seconds(start))  \(tree.root.fileCount) file  \(scanner.folders.load(ordering: .relaxed)) cartelle  "
-        + "\(gb(tree.root.alloc)) su disco  \(gb(tree.root.logical)) logici  "
-        + "\(scanner.unreadable.load(ordering: .relaxed)) cartelle non leggibili  \(tree.extensions.names.count) estensioni")
-case "grandi":
-    // le voci più grandi, tre livelli
+    print("\(seconds(start))  \(tree.root.fileCount) files  \(scanner.folders.load(ordering: .relaxed)) folders  "
+        + "\(gb(tree.root.alloc)) on disk  \(gb(tree.root.logical)) logical  "
+        + "\(scanner.unreadable.load(ordering: .relaxed)) unreadable folders  \(tree.extensions.names.count) extensions")
+case "largest":
+    // the largest entries, three levels deep
     guard let tree = DiskScanner(threads: threads).scan(path) else { exit(1) }
     func show(_ f: Folder, _ depth: Int) {
         for i in f.entries.indices.prefix(depth == 0 ? 12 : 5) {
@@ -50,8 +52,8 @@ case "grandi":
         }
     }
     show(tree.root, 0)
-case "illeggibili":
-    // le cartelle che non si lasciano leggere
+case "unreadable":
+    // the folders that cannot be read
     guard let tree = DiskScanner(threads: threads).scan(path) else { exit(1) }
     var stack = [tree.root]
     while let f = stack.popLast() {
@@ -60,7 +62,7 @@ case "illeggibili":
         }
         stack.append(contentsOf: f.subfolders)
     }
-case "esporta":
+case "export":
     guard args.count >= 4, let list = try? String(contentsOfFile: args[2], encoding: .utf8) else { exit(2) }
     var folders: [(path: String, folder: Folder)] = []
     for p in list.split(separator: "\n").map(String.init) where !p.isEmpty {
@@ -69,14 +71,14 @@ case "esporta":
     let out = URL(fileURLWithPath: args[3])
     do {
         try FolderExport.write(folders).write(to: out)
-        // chi l'ha chiesto deve poterlo leggere (qui siamo l'amministratore)
+        // whoever asked must be able to read it (here we are the administrator)
         chmod(args[3], 0o644)
     } catch {
-        print("non riesco a scrivere \(args[3]): \(error)")
+        print("cannot write \(args[3]): \(error)")
         exit(1)
     }
-case "originale":
-    // le stesse chiavi che chiede FSItem.m, con NSDirectoryEnumerator, un filo solo
+case "original":
+    // the same keys FSItem.m asks for, with NSDirectoryEnumerator, one thread
     let start = ContinuousClock.now
     let keys: [URLResourceKey] = [.nameKey, .isVolumeKey, .isPackageKey, .isDirectoryKey, .typeIdentifierKey,
                                   .fileSizeKey, .totalFileAllocatedSizeKey]
@@ -91,18 +93,18 @@ case "originale":
             total += UInt64(v.totalFileAllocatedSize ?? 0)
         }
     }
-    print("\(seconds(start))  \(files) file  \(gb(total)) su disco")
-case "mappa":
+    print("\(seconds(start))  \(files) files  \(gb(total)) on disk")
+case "map":
     guard args.count >= 4 else { exit(2) }
     let size = (args.count >= 5 ? args[4] : "2400x1500").split(separator: "x").compactMap { Int($0) }
     let (w, h) = (size[0], size[1])
     var start = ContinuousClock.now
     guard let tree = DiskScanner(threads: threads).scan(path) else { exit(1) }
-    print("scansione  \(seconds(start))")
+    print("scan     \(seconds(start))")
     start = ContinuousClock.now
     let kinds = Kinds(extensions: tree.extensions.names)
     kinds.tally(tree.root, mode: .allocated, openPackages: false)
-    print("tipi       \(seconds(start))  \(kinds.ranked(.allocated).count) tipi")
+    print("kinds    \(seconds(start))  \(kinds.ranked(.allocated).count) kinds")
     for k in kinds.ranked(.allocated).prefix(12) {
         print("    \(kinds.kinds[k].name): \(gb(kinds.kinds[k].alloc)), \(kinds.kinds[k].count)")
     }
@@ -111,23 +113,23 @@ case "mappa":
         let e = f.entries[i]
         return !e.isDirectory || kinds.isPackage(e)
     }
-    print("disposizione \(seconds(start))  \(map.cells.count) riquadri")
+    print("layout   \(seconds(start))  \(map.cells.count) tiles")
     let pixels = UnsafeMutablePointer<UInt32>.allocate(capacity: w * h)
     pixels.initialize(repeating: 0, count: w * h)
     start = ContinuousClock.now
     map.render(into: pixels) { c in
         c.entry < 0 ? Palette.other : kinds.kinds[kinds.kind(of: c.folder.entries[Int(c.entry)])].color
     }
-    print("disegno    \(seconds(start))")
+    print("drawing  \(seconds(start))")
     let ctx = CGContext(data: pixels, width: w, height: h, bitsPerComponent: 8, bytesPerRow: w * 4,
                         space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue)!
     let out = CGImageDestinationCreateWithURL(URL(fileURLWithPath: args[3]) as CFURL, "public.png" as CFString, 1, nil)!
     CGImageDestinationAddImage(out, ctx.makeImage()!, nil)
     CGImageDestinationFinalize(out)
-case "icona":
-    // una cartella finta di file vuoti ma «lunghi» (sparsi): la mappa la misura in dimensione logica
+case "icon":
+    // a fake folder of empty but “long” (sparse) files: the map measures it by logical size
     let fm = FileManager.default
-    let fake = fm.temporaryDirectory.appendingPathComponent("inventario-icona-\(getpid())").path
+    let fake = fm.temporaryDirectory.appendingPathComponent("dis-icon-\(getpid())").path
     try? fm.removeItem(atPath: fake)
     let files: [(String, Int)] = [
         ("a/1.k0", 300), ("a/2.k1", 140), ("a/3.k0", 90), ("a/4.k2", 60), ("a/5.k3", 40),
@@ -143,7 +145,7 @@ case "icona":
     }
     let tree = DiskScanner(mode: .logical).scan(fake)!
     try? fm.removeItem(atPath: fake)
-    // ogni estensione k<n> col colore n della tavolozza
+    // each extension k<n> gets palette color n
     let names = tree.extensions.names
     func color(_ c: Cell) -> SIMD3<Double> {
         guard c.entry >= 0 else { return Palette.other }
@@ -154,7 +156,7 @@ case "icona":
     try? fm.createDirectory(atPath: dir, withIntermediateDirectories: true)
     for (px, suffix) in [(16, "16x16"), (32, "16x16@2x"), (32, "32x32"), (64, "32x32@2x"), (128, "128x128"), (256, "128x128@2x"),
                          (256, "256x256"), (512, "256x256@2x"), (512, "512x512"), (1024, "512x512@2x")] {
-        // la forma delle icone di macOS: un quadrato arrotondato di 824 su 1024, con un'ombra
+        // the macOS icon shape: a rounded square of 824 in 1024, with a shadow
         let inset = Double(px) * 100 / 1024, side = Double(px) - 2 * inset
         let n = Int(side.rounded())
         let map = Treemap(folder: tree.root, entry: -1, width: n, height: n, mode: .logical, minSide: 1) { f, i in
@@ -182,7 +184,7 @@ case "icona":
         ctx.interpolationQuality = .high
         ctx.draw(image, in: rect)
         ctx.restoreGState()
-        // un filo chiaro sul bordo
+        // a thin light line on the edge
         ctx.addPath(shape)
         ctx.setStrokeColor(gray: 1, alpha: 0.25)
         ctx.setLineWidth(max(1, Double(px) / 256))
@@ -194,6 +196,6 @@ case "icona":
         pixels.deallocate()
     }
 default:
-    print("comando sconosciuto: \(args[1])")
+    print("unknown command: \(args[1])")
     exit(2)
 }

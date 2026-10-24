@@ -1,18 +1,18 @@
 import AppKit
-import InventarioCore
+import DiskInventoryCore
 
-/// La mappa: ogni file un riquadro grande quanto il posto che occupa, le cartelle a cuscino.
+/// The map: each file a tile as big as the space it takes, folders as cushions.
 ///
-/// Clic sceglie il file; doppio clic entra nella cartella sotto il puntatore (uno zoom di un
-/// livello). Le frecce passano al riquadro vicino dello stesso livello, ⇧ e le frecce a quello
-/// del livello sopra; ⌘↑ ⌘↓ cambiano livello (dal menu Vista).
+/// Click selects the file; double click goes into the folder under the pointer (one level of
+/// zoom). Arrows move to the neighboring tile at the same level, ⇧ and the arrows to the one at
+/// the level above; ⌘↑ ⌘↓ change level (from the View menu).
 final class TreemapView: NSView {
     weak var controller: DocumentController?
     private var map: Treemap?
     private var image: CGImage?
     private var hovered: Int?
-    /// misure dei tempi nel terminale (INVENTARIO_MISURA=1)
-    private let measure = ProcessInfo.processInfo.environment["INVENTARIO_MISURA"] != nil
+    /// timings in the terminal (DIS_TIMING=1)
+    private let measure = ProcessInfo.processInfo.environment["DIS_TIMING"] != nil
 
     override var isFlipped: Bool { true }
     override var acceptsFirstResponder: Bool { true }
@@ -29,7 +29,7 @@ final class TreemapView: NSView {
 
     private var scale: CGFloat { window?.backingScaleFactor ?? 2 }
 
-    /// da rifare: la disposizione (dimensioni, zoom, albero cambiati)
+    /// to redo: the layout (size, zoom or tree changed)
     func reload() {
         map = nil
         image = nil
@@ -37,7 +37,7 @@ final class TreemapView: NSView {
         needsDisplay = true
     }
 
-    /// da ridisegnare: solo i colori (tipo in evidenza)
+    /// to redraw: only the colors (highlighted kind)
     func recolor() {
         image = nil
         needsDisplay = true
@@ -87,7 +87,7 @@ final class TreemapView: NSView {
                         space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.noneSkipLast.rawValue),
                         provider: provider, decode: nil, shouldInterpolate: false, intent: .defaultIntent)
         if measure {
-            print("mappa \(w)x\(h): disposizione \(layoutTime), disegno \(renderTime), \(map.cells.count) riquadri")
+            print("map \(w)x\(h): layout \(layoutTime), drawing \(renderTime), \(map.cells.count) tiles")
         }
     }
 
@@ -97,7 +97,7 @@ final class TreemapView: NSView {
         if image == nil { build() }
         guard let image, let ctx = NSGraphicsContext.current?.cgContext else { return }
         ctx.saveGState()
-        // l'immagine ha la prima riga in alto: in una vista capovolta va raddrizzata
+        // the image has its first row at the top: in a flipped view it must be turned upright
         ctx.translateBy(x: 0, y: bounds.height)
         ctx.scaleBy(x: 1, y: -1)
         ctx.interpolationQuality = .none
@@ -111,7 +111,7 @@ final class TreemapView: NSView {
             p.stroke()
         }
         if let sel = controller?.selection, let k = cellIndex(of: sel), let r = rect(of: k) {
-            // bianco dentro e nero fuori: si vede su ogni colore
+            // white inside and black outside: visible on any color
             NSColor.black.setStroke()
             let outer = NSBezierPath(rect: r.insetBy(dx: 1, dy: 1))
             outer.lineWidth = 3
@@ -123,7 +123,7 @@ final class TreemapView: NSView {
         }
     }
 
-    // MARK: riquadri e voci
+    // MARK: tiles and entries
 
     private func rect(of cell: Int) -> NSRect? {
         guard let map, cell < map.cells.count else { return nil }
@@ -160,7 +160,7 @@ final class TreemapView: NSView {
         let path = path(at: p)
         guard let last = path.last, let c = controller else { return }
         if event.clickCount == 2 {
-            // un livello più giù: la cartella sotto il puntatore dentro quella mostrata
+            // one level down: the folder under the pointer inside the one shown
             if path.count > 1, let item = item(of: path[1]), let folder = item.contents, c.model?.isContainer(item) == true {
                 c.zoom(into: folder)
             }
@@ -196,7 +196,7 @@ final class TreemapView: NSView {
         controller?.hover(nil)
     }
 
-    // MARK: tastiera
+    // MARK: keyboard
 
     override func keyDown(with event: NSEvent) {
         let mods = event.modifierFlags.intersection([.shift, .command, .option, .control])
@@ -218,12 +218,12 @@ final class TreemapView: NSView {
         }
     }
 
-    /// Passa al riquadro accanto: quello che sta appena oltre il lato, allo stesso livello
-    /// (con ⇧ al livello della cartella sopra: il passo grande).
+    /// Moves to the neighboring tile: the one just past the edge, at the same level
+    /// (with ⇧ at the level of the folder above: the big step).
     private func move(_ key: NSEvent.SpecialKey, up: Bool) {
         guard let map, let c = controller else { return }
         guard let sel = c.selection, let k = cellIndex(of: sel) else {
-            // niente di scelto: il riquadro più grande
+            // nothing selected: the largest tile
             if map.cells.count > 1 { c.select(item(of: Int(map.cells[0].firstChild)), from: .map) }
             return
         }
