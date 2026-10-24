@@ -44,8 +44,12 @@ final class OutlineController: NSObject, NSOutlineViewDataSource, NSOutlineViewD
         let kind = NSTableColumn(identifier: .init("kind"))
         kind.title = L("Kind")
         kind.width = 120
+        // numbers keep their width; when the window narrows, names make room
+        size.minWidth = 76
+        share.minWidth = 56
         for c in [name, size, share, kind] { view.addTableColumn(c) }
         view.outlineTableColumn = name
+        view.columnAutoresizingStyle = .firstColumnOnlyAutoresizingStyle
         view.dataSource = self
         view.delegate = self
         view.style = .inset
@@ -67,7 +71,16 @@ final class OutlineController: NSObject, NSOutlineViewDataSource, NSOutlineViewD
         children.removeAll()
         root = controller?.model.map { OutlineItem(Item($0.tree.root)) }
         view.reloadData()
+        fitNameColumn()
         if let root { view.expandItem(root) }
+    }
+
+    /// Saved column widths may add up to more than the list shows: the names take what is left.
+    func fitNameColumn() {
+        guard let name = view.outlineTableColumn else { return }
+        let others = view.tableColumns.filter { $0 !== name }.reduce(0) { $0 + $1.width + view.intercellSpacing.width }
+        let available = scrollView.contentSize.width - others - view.intercellSpacing.width - 24
+        if available > name.minWidth { name.width = available }
     }
 
     private func rows(of folder: Folder) -> [OutlineItem] {

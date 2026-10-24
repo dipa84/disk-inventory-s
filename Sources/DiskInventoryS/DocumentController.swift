@@ -135,8 +135,15 @@ final class DocumentController: NSWindowController, NSWindowDelegate, NSToolbarD
 
     private func snapshot(to path: String) {
         window?.displayIfNeeded()
-        guard let view = window?.contentView?.superview, let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { return }
-        view.cacheDisplay(in: view.bounds, to: rep)
+        // DIS_PHOTO_CONTENT=1: only the window's content, without title bar and toolbar
+        let contentOnly = ProcessInfo.processInfo.environment["DIS_PHOTO_CONTENT"] != nil
+        if contentOnly { notice.isHidden = true }
+        guard let view = contentOnly ? window?.contentView : window?.contentView?.superview else { return }
+        var rect = view.bounds
+        // the content runs under the title bar (full size content view): leave that part out
+        if contentOnly { rect.size.height -= view.safeAreaInsets.top }
+        guard let rep = view.bitmapImageRepForCachingDisplay(in: rect) else { return }
+        view.cacheDisplay(in: rect, to: rep)
         try? rep.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: path))
         NSApp.terminate(nil)
     }
@@ -213,6 +220,8 @@ final class DocumentController: NSWindowController, NSWindowDelegate, NSToolbarD
         let share = d.object(forKey: "folderListShare") as? Double ?? 0.62
         split.setPosition(width, ofDividerAt: 0)
         left.setPosition(left.bounds.height * share, ofDividerAt: 0)
+        content.layoutSubtreeIfNeeded()
+        outline.fitNameColumn()
         leftSplit = left
         NotificationCenter.default.addObserver(self, selector: #selector(splitMoved), name: NSSplitView.didResizeSubviewsNotification, object: split)
         NotificationCenter.default.addObserver(self, selector: #selector(splitMoved), name: NSSplitView.didResizeSubviewsNotification, object: left)

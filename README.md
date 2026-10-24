@@ -4,9 +4,41 @@ What is taking up the disk: a cushion treemap of every file, each as big as the 
 It is Disk Inventory X by Tjark Derlien (gitlab.com/tderlien/disk-inventory-x) rewritten in Swift
 for today's Macs: native on Apple Silicon, and much faster. The S stands for Swift.
 
+Free software and freeware: GPL 3, no ads, no tracking, no accounts.
+
+![Disk Inventory S showing /System](docs/screenshot.png)
+
+## Thanks
+
+Disk Inventory S exists thanks to **[Disk Inventory X](http://www.derlien.com)** by **Tjark Derlien**
+([source](https://gitlab.com/tderlien/disk-inventory-x)), which since 2003 has shown Mac users what
+fills their disks, and which he released as free software under the GPL. Its treemap, with the
+cushion shading of van Wijk and van de Wetering, its colors and its idea of looking at a whole disk
+at once are all his; this rewrite only tries to make them fast on today's Macs. Thank you, Tjark.
+
 This is a modified version, not the author's: rewritten by Riccardo Di Paola in 2026 (the GPL asks
 to say so). The treemap layout and drawing come from the original's TMVItem.m and
-TMVCushionRenderer.m; scanning, model and interface are new.
+TMVCushionRenderer.m; scanning, model and interface are new. Please report problems here, not to
+the original author.
+
+## Install
+
+Requires macOS 15 or later, on Apple Silicon or Intel.
+
+**Download** the `.dmg` from [Releases](https://github.com/dipa84/disk-inventory-s/releases) and drag
+the app into Applications. The first time, macOS says it cannot verify the developer: the app is
+not signed with a paid Apple Developer ID. Open **System Settings › Privacy & Security**, scroll
+down and click **Open Anyway** (once per version). The source is all here, if you want to check.
+
+**Or with one Terminal command**, which skips that step (files downloaded with `curl` are not
+quarantined):
+
+    curl -fsSL https://raw.githubusercontent.com/dipa84/disk-inventory-s/main/install.sh | zsh
+
+**Or build it yourself** (see Building below).
+
+To read everything, give it **Full Disk Access** (System Settings › Privacy & Security › Full Disk
+Access): it then reads Mail, Messages and the other private folders without asking for each one.
 
 | | Disk Inventory X (one thread, NSURL) | Disk Inventory S | `du -sk` |
 |---|---|---|---|

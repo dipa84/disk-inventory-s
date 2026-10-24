@@ -191,6 +191,8 @@ final class TreemapView: NSView {
     }
 
     override func mouseMoved(with event: NSEvent) {
+        // a photo for the README must not show where the pointer happens to be
+        if ProcessInfo.processInfo.environment["DIS_PHOTO"] != nil { return }
         let p = convert(event.locationInWindow, from: nil)
         let h = path(at: p).last
         guard h != hovered else { return }
