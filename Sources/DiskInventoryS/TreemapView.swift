@@ -140,7 +140,7 @@ final class TreemapView: NSView {
             let shade = NSBezierPath(rect: bounds)
             shade.append(NSBezierPath(rect: r))
             shade.windingRule = .evenOdd
-            NSColor.black.withAlphaComponent(0.55).setFill()
+            NSColor.black.withAlphaComponent(0.28).setFill()
             shade.fill()
             NSColor.white.withAlphaComponent(0.9).setStroke()
             let frame = NSBezierPath(rect: r.insetBy(dx: 0.75, dy: 0.75))
