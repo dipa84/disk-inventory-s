@@ -73,6 +73,7 @@ final class TreemapView: NSView {
             guard cell.entry >= 0 else { return Palette.other }
             let e = cell.folder.entries[Int(cell.entry)]
             if e.isDirectory && !kinds.isPackage(e) { return Palette.other * 0.6 }
+            if e.flags.contains(.special) { return kinds.kinds[kinds.kind(of: e)].color }
             let k = kinds.kind(of: e)
             let color = kinds.kinds[k].color
             if let highlight, highlight != k { return Palette.other * 0.35 }

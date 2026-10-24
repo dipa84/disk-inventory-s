@@ -140,6 +140,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             .separator(),
             item("Dimensione logica (invece che su disco)", #selector(DocumentController.toggleSizeMode(_:))),
             item("Apri i pacchetti", #selector(DocumentController.togglePackages(_:))),
+            item("Spazio libero e altro spazio", #selector(DocumentController.toggleSpecialSpace(_:))),
             .separator(),
             item("Schermo intero", #selector(NSWindow.toggleFullScreen(_:)), "f", [.command, .control]),
         ])

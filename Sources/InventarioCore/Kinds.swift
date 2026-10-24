@@ -22,12 +22,15 @@ public final class Kinds {
     private var packageKind: [Int32] = []
     private var byName: [String: Int32] = [:]
     private var folderKind: Int32 = 0, symlinkKind: Int32 = 0, executableKind: Int32 = 0, documentKind: Int32 = 0
+    private var freeKind: Int32 = 0, otherKind: Int32 = 0
 
     public init(extensions: [String]) {
         folderKind = add(UTType.folder)
         symlinkKind = add(UTType.symbolicLink)
         executableKind = add(UTType.unixExecutable)
         documentKind = add(UTType.data)
+        freeKind = add(name: "Spazio libero", type: nil)
+        otherKind = add(name: "Altro spazio", type: nil)
         fileKind = [Int32](repeating: documentKind, count: extensions.count)
         packageKind = [Int32](repeating: -1, count: extensions.count)
         for (id, ext) in extensions.enumerated() where id > 0 {
@@ -61,6 +64,7 @@ public final class Kinds {
     }
 
     public func kind(of e: Entry) -> Int {
+        if e.flags.contains(.special) { return Int(e.ext == Tree.freeSpace ? freeKind : otherKind) }
         if e.isDirectory {
             let p = packageKind[Int(e.ext)]
             return Int(p >= 0 ? p : folderKind)
@@ -92,10 +96,13 @@ public final class Kinds {
                 kinds[k].count += 1
             }
         }
-        let order = kinds.indices.sorted { kinds[$0].size(mode) > kinds[$1].size(mode) }
+        // i colori ai tipi veri; lo spazio libero chiaro, l'altro scuro
+        let order = kinds.indices.filter { $0 != freeKind && $0 != otherKind }.sorted { kinds[$0].size(mode) > kinds[$1].size(mode) }
         for (rank, k) in order.enumerated() {
             kinds[k].color = rank < Palette.base.count && kinds[k].count > 0 ? Palette.base[rank] : Palette.other
         }
+        kinds[Int(freeKind)].color = [0.95, 0.95, 0.95]
+        kinds[Int(otherKind)].color = [0.3, 0.3, 0.3]
     }
 
     /// i tipi presenti, dal più grande

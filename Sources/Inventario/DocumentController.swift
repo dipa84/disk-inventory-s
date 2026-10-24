@@ -319,7 +319,7 @@ final class DocumentController: NSWindowController, NSWindowDelegate, NSToolbarD
     // MARK: azioni sulla scelta
 
     private var selectedPath: String? {
-        guard let doc = model, let sel = selection, sel.isValid else { return nil }
+        guard let doc = model, let sel = selection, sel.isValid, !doc.isSpecial(sel) else { return nil }
         return doc.path(sel)
     }
 
@@ -340,7 +340,7 @@ final class DocumentController: NSWindowController, NSWindowDelegate, NSToolbarD
     }
 
     @objc func moveToTrash(_ sender: Any?) {
-        guard let doc = model, let sel = selection, sel.isValid, !sel.isRoot, let window else { return }
+        guard let doc = model, let sel = selection, sel.isValid, !sel.isRoot, !doc.isSpecial(sel), let window else { return }
         let alert = NSAlert()
         alert.messageText = "Spostare «\(doc.name(sel))» nel Cestino?"
         var info = "\(Format.size(sel.size(doc.mode)))"
@@ -421,6 +421,7 @@ final class DocumentController: NSWindowController, NSWindowDelegate, NSToolbarD
 
     /// l'albero è cambiato: tutto da rifare
     private func changed() {
+        model?.updateSpecialSpace()
         model?.tally()
         outline.reload()
         kindsTable.reload()
@@ -457,9 +458,16 @@ final class DocumentController: NSWindowController, NSWindowDelegate, NSToolbarD
         changed()
     }
 
+    @objc func toggleSpecialSpace(_ sender: Any?) {
+        guard let doc = model else { return }
+        doc.showSpecialSpace.toggle()
+        if let sel = selection, doc.isSpecial(sel) { selection = nil }
+        changed()
+    }
+
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
         guard let doc = model else { return false }
-        let hasSelection = selection?.isValid == true
+        let hasSelection = selection.map { $0.isValid && !doc.isSpecial($0) } == true
         switch menuItem.action {
         case #selector(toggleSizeMode(_:)):
             menuItem.state = doc.mode == .logical ? .on : .off
@@ -467,6 +475,9 @@ final class DocumentController: NSWindowController, NSWindowDelegate, NSToolbarD
         case #selector(togglePackages(_:)):
             menuItem.state = doc.openPackages ? .on : .off
             return true
+        case #selector(toggleSpecialSpace(_:)):
+            menuItem.state = doc.showSpecialSpace && doc.isVolume ? .on : .off
+            return doc.isVolume
         case #selector(zoomOut(_:)), #selector(zoomToTop(_:)):
             return zoom.parent != nil
         case #selector(zoomForward(_:)):
@@ -475,6 +486,8 @@ final class DocumentController: NSWindowController, NSWindowDelegate, NSToolbarD
             return true
         case #selector(selectParent(_:)):
             return selection?.parent != nil
+        case #selector(refresh(_:)) where selection.map(doc.isSpecial) == true:
+            return false
         case #selector(moveToTrash(_:)):
             return hasSelection && selection?.isRoot == false
         case #selector(refresh(_:)), #selector(refreshAll(_:)):

@@ -31,6 +31,8 @@ public struct Entry {
         public static let unreadable = Flags(rawValue: 32)
         /// un clone (APFS) di un file già contato: occupa solo i blocchi che ha di suo
         public static let cloneSeen = Flags(rawValue: 64)
+        /// non un file: lo spazio libero o l'altro spazio del volume (`ext` dice quale)
+        public static let special = Flags(rawValue: 128)
     }
 
     public var isDirectory: Bool { flags.contains(.directory) }
@@ -199,6 +201,28 @@ public final class Tree: @unchecked Sendable {
         all.withUnsafeBufferPointer { fs in
             DispatchQueue.concurrentPerform(iterations: fs.count) { fs[$0].sortEntries(mode) }
         }
+    }
+
+    public static let freeSpace: UInt32 = 1
+    public static let otherSpace: UInt32 = 2
+
+    /// Aggiunge (o toglie, con nil) alla cartella di partenza lo spazio libero del volume e
+    /// l'altro spazio: quello occupato ma non contato (cartelle protette, istantanee, sistema).
+    public func setSpecialSpace(free: UInt64?, other: UInt64?) {
+        let r = root
+        for i in r.entries.indices.reversed() where r.entries[i].flags.contains(.special) {
+            let e = r.entries.remove(at: i)
+            r.alloc &-= e.alloc
+            r.logical &-= e.logical
+        }
+        for (size, kind, name) in [(free, Self.freeSpace, "Spazio libero"), (other, Self.otherSpace, "Altro spazio")] {
+            guard let size, size > 0 else { continue }
+            let entry = Entry(alloc: size, logical: size, nameStart: 0, ext: kind, sub: -1, nameLen: 0, flags: .special)
+            Array(name.utf8).withUnsafeBytes { r.append(name: $0, entry: entry) }
+            r.alloc &+= size
+            r.logical &+= size
+        }
+        r.sortEntries(sizeMode)
     }
 
     /// Toglie una voce (portata nel Cestino) e aggiorna le somme fino alla radice.

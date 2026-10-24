@@ -49,14 +49,36 @@ final class Document {
     let tree: Tree
     let kinds: Kinds
     var openPackages = false
+    /// spazio libero e altro spazio, quando la cartella di partenza è un volume intero
+    var showSpecialSpace = true
+    let isVolume: Bool
     /// la tipologia scelta nell'elenco dei tipi: la mappa la mette in evidenza
     var highlightedKind: Int?
 
     init(tree: Tree) {
         self.tree = tree
         kinds = Kinds(extensions: tree.extensions.names)
+        var fs = statfs()
+        isVolume = statfs(tree.rootPath, &fs) == 0 && withUnsafeBytes(of: fs.f_mntonname) {
+            String(cString: $0.baseAddress!.assumingMemoryBound(to: CChar.self))
+        } == tree.rootPath
+        updateSpecialSpace()
         tally()
     }
+
+    /// Rifà le voci dello spazio libero e dell'altro spazio (dopo il Cestino cambiano).
+    func updateSpecialSpace() {
+        tree.setSpecialSpace(free: nil, other: nil)
+        guard isVolume, showSpecialSpace else { return }
+        var fs = statfs()
+        guard statfs(tree.rootPath, &fs) == 0 else { return }
+        let total = UInt64(fs.f_blocks) * UInt64(fs.f_bsize)
+        let free = UInt64(fs.f_bavail) * UInt64(fs.f_bsize)
+        let counted = tree.root.alloc
+        tree.setSpecialSpace(free: free, other: total > free + counted ? total - free - counted : nil)
+    }
+
+    func isSpecial(_ item: Item) -> Bool { item.entryValue?.flags.contains(.special) == true }
 
     var mode: SizeMode { tree.sizeMode }
 
