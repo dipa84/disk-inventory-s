@@ -1,15 +1,21 @@
 #!/bin/zsh
-# Disk Inventory S.app: compila la finestra e la mette in un pacchetto con l'icona. Firmato «ad hoc»
-# (per questo Mac): per darlo ad altri serve la firma di uno sviluppatore Apple.
+# Builds Disk Inventory S.app: the window, the helper for system folders, the icon and the
+# translations.
 #
-# uso: tools/inventario-app.sh            → .build/Disk Inventory S.app
-#      tools/inventario-app.sh --installa → anche in /Applications
+# Signing: with the local certificate "Disk Inventory S - Riccardo Di Paola" when it is in the
+# keychain (see tools/make-certificate.sh), otherwise ad hoc. It matters for privacy permissions:
+# macOS remembers them by the app's designated requirement. Ad hoc, that is the hash of the binary,
+# so every build looks like a new app and the permissions are asked again; with the certificate it
+# is the bundle identifier plus the certificate, which stay the same across builds.
+#
+# usage: tools/inventario-app.sh            → .build/Disk Inventory S.app
+#        tools/inventario-app.sh --installa → also into /Applications
 set -e
 cd "${0:A:h}/.."
-# le traduzioni: si ferma se una frase non è tradotta
+# translations: stops if a string is not translated
 python3 -I tools/traduzioni.py
 swift build -c release --product Inventario
-# il programma d'aiuto per le cartelle di sistema (lo lancia l'app, con la password)
+# the helper for system folders (the app runs it with the administrator password)
 swift build -c release --product inventario-cli
 version=$(cat VERSION)
 name="Disk Inventory S"
@@ -22,9 +28,15 @@ cp assets/macos/Inventario.icns "$app/Contents/Resources/"
 cp -R assets/macos/Localizations/*.lproj "$app/Contents/Resources/"
 sed "s/@VERSIONE@/$version/g" assets/macos/Info.plist > "$app/Contents/Info.plist"
 plutil -lint "$app/Contents/Info.plist" >/dev/null
-codesign --force --deep --sign - "$app"
+identity="Disk Inventory S - Riccardo Di Paola"
+if security find-identity -p codesigning | grep -q "\"$identity\""; then
+  codesign --force --deep --sign "$identity" "$app"
+else
+  echo "warning: no \"$identity\" certificate, signing ad hoc (permissions will be asked again)" >&2
+  codesign --force --deep --sign - "$app"
+fi
 if [[ "$1" == "--installa" ]]; then
-  # il nome di lavoro di prima
+  # the earlier working name
   rm -rf /Applications/Inventario.app
   rm -rf "/Applications/$name.app"
   cp -R "$app" /Applications/
