@@ -11,6 +11,13 @@ import AppKit
 import DiskInventoryCore
 import UniformTypeIdentifiers
 
+/// The first column takes whatever the others leave of the visible width.
+private func fitFirstColumn(_ table: NSTableView, _ first: NSTableColumn, _ scroll: NSScrollView) {
+    let others = table.tableColumns.filter { $0 !== first && !$0.isHidden }.reduce(0) { $0 + $1.width + table.intercellSpacing.width }
+    let available = scroll.contentSize.width - others - table.intercellSpacing.width - 24
+    first.width = max(first.minWidth, available)
+}
+
 // MARK: the folder list
 
 final class OutlineItem: NSObject {
@@ -37,16 +44,19 @@ final class OutlineController: NSObject, NSOutlineViewDataSource, NSOutlineViewD
         name.width = 220
         let size = NSTableColumn(identifier: .init("size"))
         size.title = L("Size")
-        size.width = 80
+        size.width = 84
         let share = NSTableColumn(identifier: .init("share"))
         share.title = "%"
-        share.width = 58
+        share.width = 56
         let kind = NSTableColumn(identifier: .init("kind"))
         kind.title = L("Kind")
-        kind.width = 120
+        kind.width = 110
         // numbers keep their width; when the window narrows, names make room
-        size.minWidth = 76
-        share.minWidth = 56
+        // the number columns keep their width (they are not saved: old saved widths were too
+        // wide); the names get the rest
+        for c in [size, share] { c.minWidth = c.width; c.maxWidth = c.width; c.resizingMask = [] }
+        kind.minWidth = 80
+        kind.maxWidth = 200
         for c in [name, size, share, kind] { view.addTableColumn(c) }
         view.outlineTableColumn = name
         view.columnAutoresizingStyle = .firstColumnOnlyAutoresizingStyle
@@ -56,13 +66,19 @@ final class OutlineController: NSObject, NSOutlineViewDataSource, NSOutlineViewD
         view.usesAlternatingRowBackgroundColors = false
         view.allowsMultipleSelection = false
         view.autosaveName = "DiskInventoryS.folders"
-        view.autosaveTableColumns = true
+        view.autosaveTableColumns = false
+        // NSOutlineView would widen the names column on each expansion, pushing the others out
+        view.autoresizesOutlineColumn = false
         view.target = self
         view.doubleAction = #selector(doubleClicked)
         view.owner = self
         scrollView.documentView = view
         scrollView.hasVerticalScroller = true
         scrollView.autohidesScrollers = true
+        scrollView.postsFrameChangedNotifications = true
+        NotificationCenter.default.addObserver(forName: NSView.frameDidChangeNotification, object: scrollView, queue: .main) { [weak self] _ in
+            self?.fitNameColumn()
+        }
     }
 
     fileprivate var menuController: DocumentController? { controller }
@@ -76,11 +92,13 @@ final class OutlineController: NSObject, NSOutlineViewDataSource, NSOutlineViewD
     }
 
     /// Saved column widths may add up to more than the list shows: the names take what is left.
+    /// When the list is narrow the Kind column goes first, then %: names matter more.
     func fitNameColumn() {
         guard let name = view.outlineTableColumn else { return }
-        let others = view.tableColumns.filter { $0 !== name }.reduce(0) { $0 + $1.width + view.intercellSpacing.width }
-        let available = scrollView.contentSize.width - others - view.intercellSpacing.width - 24
-        if available > name.minWidth { name.width = available }
+        let width = scrollView.contentSize.width
+        view.tableColumn(withIdentifier: .init("kind"))?.isHidden = width < 440
+        view.tableColumn(withIdentifier: .init("share"))?.isHidden = width < 330
+        fitFirstColumn(view, name, scrollView)
     }
 
     private func rows(of folder: Folder) -> [OutlineItem] {
@@ -282,17 +300,26 @@ final class KindsController: NSObject, NSTableViewDataSource, NSTableViewDelegat
         size.width = 80
         let count = NSTableColumn(identifier: .init("files"))
         count.title = L("Files")
-        count.width = 70
+        count.width = 72
         for c in [name, size, count] { table.addTableColumn(c) }
         table.dataSource = self
         table.delegate = self
         table.style = .inset
         table.allowsEmptySelection = true
         table.autosaveName = "DiskInventoryS.kinds"
-        table.autosaveTableColumns = true
+        table.autosaveTableColumns = false
+        for c in [size, count] { c.minWidth = c.width; c.maxWidth = c.width; c.resizingMask = [] }
+        table.columnAutoresizingStyle = .firstColumnOnlyAutoresizingStyle
         scrollView.documentView = table
         scrollView.hasVerticalScroller = true
         scrollView.autohidesScrollers = true
+        scrollView.postsFrameChangedNotifications = true
+        NotificationCenter.default.addObserver(forName: NSView.frameDidChangeNotification, object: scrollView, queue: .main) { [weak self] _ in
+            guard let self, let name = self.table.tableColumns.first else { return }
+            // narrow: the file count goes, the kind's name stays
+            self.table.tableColumn(withIdentifier: .init("files"))?.isHidden = self.scrollView.contentSize.width < 320
+            fitFirstColumn(self.table, name, self.scrollView)
+        }
     }
 
     func reload() {

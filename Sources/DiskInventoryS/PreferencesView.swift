@@ -49,7 +49,7 @@ struct PreferencesView: View {
             ScanPane().tabItem { Label(L("Scan"), systemImage: "magnifyingglass") }.tag(2)
             SpacePane().tabItem { Label(L("Space"), systemImage: "internaldrive") }.tag(3)
         }
-        .padding(20)
+        .padding(.vertical, 8)
         .frame(width: 560)
         .fixedSize(horizontal: false, vertical: true)
     }
@@ -110,6 +110,7 @@ private struct GeneralPane: View {
                 }
             }
         }
+        .formStyle(.grouped)
         .onChange(of: binary) { _, _ in notify() }
     }
 
@@ -205,6 +206,7 @@ private struct MapPane: View {
                 }
             }
         }
+        .formStyle(.grouped)
         .onChange(of: height) { _, _ in notify() }
         .onChange(of: ambient) { _, _ in notify() }
         .onChange(of: edges) { _, _ in notify() }
@@ -231,6 +233,7 @@ private struct ScanPane: View {
             Note(L("Names separated by commas. They stay in the map as empty folders."))
             Note(L("These choices apply from the next scan."))
         }
+        .formStyle(.grouped)
     }
 }
 
@@ -251,6 +254,7 @@ private struct SpacePane: View {
             Toggle(L("Count purgeable space as free too, like the Finder"), isOn: $purgeable)
             Note(L("The system frees purgeable space (caches, local iCloud copies) by itself when needed."))
         }
+        .formStyle(.grouped)
         .onChange(of: show) { _, _ in notify() }
         .onChange(of: purgeable) { _, _ in notify() }
     }

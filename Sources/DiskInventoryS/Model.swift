@@ -166,6 +166,9 @@ enum Format {
 
     static func count(_ n: Int) -> String { n.formatted(.number) }
 
+    /// seconds with one decimal, in the user's format (2,1 s in Italian)
+    static func seconds(_ s: Double) -> String { s.formatted(.number.precision(.fractionLength(1))) + " s" }
+
     static func percent(_ part: UInt64, of whole: UInt64) -> String {
         guard whole > 0 else { return "" }
         let p = Double(part) / Double(whole)

@@ -44,6 +44,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
             return
         }
+        // DIS_START_PHOTO=file.png: an image of the disks window (for testing)
+        if let photo = ProcessInfo.processInfo.environment["DIS_START_PHOTO"] {
+            showStart(nil)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
+                if let w = self?.start { photographWindow(w, to: photo) }
+                NSApp.terminate(nil)
+            }
+            return
+        }
         if documents.isEmpty {
             switch Prefs.atLaunch {
             case .disks: showStart(nil)
@@ -110,12 +119,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             start.makeKeyAndOrderFront(nil)
             return
         }
-        let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 520, height: 420), styleMask: [.titled, .closable, .resizable],
+        let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 520, height: 300), styleMask: [.titled, .closable],
                          backing: .buffered, defer: false)
         w.title = "Disk Inventory S"
         w.isReleasedWhenClosed = false
-        w.contentView = NSHostingView(rootView: StartView(open: { [weak self] in self?.open(path: $0) },
-                                                          choose: { [weak self] in self?.openFolder(nil) }))
+        // the window takes the size of its contents (and follows it when a disk comes or goes)
+        let host = NSHostingView(rootView: StartView(open: { [weak self] in self?.open(path: $0) },
+                                                     choose: { [weak self] in self?.openFolder(nil) }))
+        host.sizingOptions = [.preferredContentSize]
+        w.contentView = host
         w.center()
         w.makeKeyAndOrderFront(nil)
         start = w
@@ -195,6 +207,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 }
 
+/// For testing: an image of a window's content (title bar controls in glass do not render).
+func photographWindow(_ window: NSWindow, to path: String) {
+    window.displayIfNeeded()
+    guard let view = window.contentView?.superview, let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { return }
+    view.cacheDisplay(in: view.bounds, to: rep)
+    try? rep.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: path))
+}
+
 // MARK: the start window: the disks
 
 struct Volume: Identifiable {
@@ -215,7 +235,8 @@ struct StartView: View {
         VStack(alignment: .leading, spacing: 12) {
             Text(verbatim: L("What’s taking up the disk?"))
                 .font(.title2.weight(.semibold))
-            List(volumes) { v in
+            VStack(spacing: 0) {
+              ForEach(volumes) { v in
                 Button { open(v.id.path) } label: {
                     HStack(spacing: 12) {
                         Image(nsImage: v.icon).resizable().frame(width: 36, height: 36)
@@ -228,12 +249,15 @@ struct StartView: View {
                                 .monospacedDigit()
                         }
                     }
-                    .padding(.vertical, 4)
+                    .padding(.vertical, 10)
+                    .padding(.horizontal, 12)
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                if v.id != volumes.last?.id { Divider().padding(.leading, 60) }
+              }
             }
-            .listStyle(.inset)
+            .background(RoundedRectangle(cornerRadius: 10).fill(.background.secondary))
             HStack {
                 Text(verbatim: L("You can also drag a folder onto the %@ icon.", "Disk Inventory S"))
                     .font(.caption)
@@ -244,6 +268,8 @@ struct StartView: View {
             }
         }
         .padding(20)
+        .frame(width: 520)
+        .fixedSize(horizontal: false, vertical: true)
         .onAppear(perform: load)
         .onReceive(NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.didMountNotification)) { _ in load() }
         .onReceive(NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.didUnmountNotification)) { _ in load() }

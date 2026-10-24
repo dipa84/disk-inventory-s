@@ -74,6 +74,13 @@ final class DocumentController: NSWindowController, NSWindowDelegate, NSToolbarD
         self.progress = progress
         let host = NSHostingView(rootView: ScanProgressView(progress: progress) { [weak self] in self?.cancelScan() })
         window?.contentView = host
+        // DIS_PROGRESS_PHOTO=file.png: an image of the progress while scanning (for testing)
+        if let photo = ProcessInfo.processInfo.environment["DIS_PROGRESS_PHOTO"] {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in
+                if let w = self?.window { photographWindow(w, to: photo) }
+                NSApp.terminate(nil)
+            }
+        }
         let path = rootPath
         let start = ContinuousClock.now
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
@@ -110,7 +117,7 @@ final class DocumentController: NSWindowController, NSWindowDelegate, NSToolbarD
         kindsTable.reload()
         treemap.reload()
         let seconds = Double(elapsed.components.seconds) + Double(elapsed.components.attoseconds) / 1e18
-        readIn = String(format: "%.1f s", seconds)
+        readIn = Format.seconds(seconds)
         updateNotice()
         setDefaultStatus()
         updateStatus()
@@ -182,7 +189,9 @@ final class DocumentController: NSWindowController, NSWindowDelegate, NSToolbarD
         split.dividerStyle = .thin
         split.addArrangedSubview(left)
         split.addArrangedSubview(treemap)
-        split.setHoldingPriority(.defaultLow + 1, forSubviewAt: 0)
+        // the same holding priority: when the window changes size, list and map share it
+        split.setHoldingPriority(.defaultLow, forSubviewAt: 0)
+        split.setHoldingPriority(.defaultLow, forSubviewAt: 1)
 
         status.lineBreakMode = .byTruncatingMiddle
         status.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
@@ -220,9 +229,10 @@ final class DocumentController: NSWindowController, NSWindowDelegate, NSToolbarD
         // last time's proportions (NSSplitView would save them itself, but gets it wrong with constraints)
         content.layoutSubtreeIfNeeded()
         let d = UserDefaults.standard
-        let width = d.object(forKey: "listWidth") as? Double ?? 420
+        let listShare = d.object(forKey: "listShare") as? Double ?? 0.32
         let share = d.object(forKey: "folderListShare") as? Double ?? 0.62
-        split.setPosition(width, ofDividerAt: 0)
+        let total = Double(split.bounds.width)
+        split.setPosition(min(max(total * listShare, 260), total - 300), ofDividerAt: 0)
         left.setPosition(left.bounds.height * share, ofDividerAt: 0)
         content.layoutSubtreeIfNeeded()
         outline.fitNameColumn()
@@ -236,7 +246,9 @@ final class DocumentController: NSWindowController, NSWindowDelegate, NSToolbarD
     @objc private func splitMoved(_ n: Notification) {
         // only when the user moves them, not when the window is resized
         guard n.userInfo?["NSSplitViewDividerIndex"] != nil, let left = leftSplit, left.bounds.height > 0 else { return }
-        UserDefaults.standard.set(Double(left.frame.width), forKey: "listWidth")
+        if let split, split.bounds.width > 0 {
+            UserDefaults.standard.set(Double(left.frame.width / split.bounds.width), forKey: "listShare")
+        }
         UserDefaults.standard.set(Double(outline.scrollView.frame.height / left.bounds.height), forKey: "folderListShare")
     }
 
@@ -816,7 +828,7 @@ struct ScanProgressView: View {
             Text(verbatim: L("%@ files in %@ folders · %@", Format.count(progress.files), Format.count(progress.folders), Format.size(progress.bytes)))
                 .monospacedDigit()
                 .foregroundStyle(.secondary)
-            Text(verbatim: String(format: "%.1f s", progress.seconds))
+            Text(verbatim: Format.seconds(progress.seconds))
                 .monospacedDigit()
                 .foregroundStyle(.tertiary)
             Button(progress.cancelling ? L("Cancelling…") : L("Cancel"), action: cancel)
