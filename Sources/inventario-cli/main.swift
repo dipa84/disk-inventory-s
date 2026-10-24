@@ -47,6 +47,16 @@ case "grandi":
         }
     }
     show(tree.root, 0)
+case "illeggibili":
+    // le cartelle che non si lasciano leggere
+    guard let tree = DiskScanner(threads: threads).scan(path) else { exit(1) }
+    var stack = [tree.root]
+    while let f = stack.popLast() {
+        for (i, e) in f.entries.enumerated() where e.flags.contains(.unreadable) && f.subfolder(at: i)?.unreadable == true {
+            print(tree.path(of: f, entry: i))
+        }
+        stack.append(contentsOf: f.subfolders)
+    }
 case "originale":
     // le stesse chiavi che chiede FSItem.m, con NSDirectoryEnumerator, un filo solo
     let start = ContinuousClock.now

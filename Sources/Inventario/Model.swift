@@ -90,6 +90,7 @@ final class Document {
         }
         if e.flags.contains(.unreadable) { return L("non leggibile: serve l'Accesso completo al disco") }
         if e.flags.contains(.mountPoint) { return L("un altro volume: non è contato qui") }
+        if e.flags.contains(.firmlinked) { return L("è la stessa cartella che si vede da / (firmlink): contata là") }
         if e.flags.contains(.skipped) { return L("saltata (Impostazioni › Scansione)") }
         if e.flags.contains(.hardlinkSeen) { return L("un altro nome di un file già contato altrove") }
         if e.flags.contains(.cloneSeen) { return L("un clone: conta solo quello che ha di suo") }

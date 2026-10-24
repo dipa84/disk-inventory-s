@@ -35,6 +35,8 @@ public struct Entry {
         public static let special = Flags(rawValue: 128)
         /// una cartella saltata per le preferenze (node_modules, .git…): non è stata letta
         public static let skipped = Flags(rawValue: 256)
+        /// nel volume dei dati, una cartella dove porta un firmlink (/Users…): contata là
+        public static let firmlinked = Flags(rawValue: 512)
     }
 
     public var isDirectory: Bool { flags.contains(.directory) }

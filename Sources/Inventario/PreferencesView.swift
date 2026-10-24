@@ -215,7 +215,7 @@ private struct ScanPane: View {
 
 private struct SpacePane: View {
     @AppStorage(Prefs.Key.showSpace) private var show = true
-    @AppStorage(Prefs.Key.purgeableIsFree) private var purgeable = true
+    @AppStorage(Prefs.Key.purgeableIsFree) private var purgeable = false
 
     var body: some View {
         Form {

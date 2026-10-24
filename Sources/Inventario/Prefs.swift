@@ -24,7 +24,7 @@ enum Prefs {
             Key.skipNames: "",
             Key.openPackages: false,
             Key.showSpace: true,
-            Key.purgeableIsFree: true,
+            Key.purgeableIsFree: false,
         ])
     }
 

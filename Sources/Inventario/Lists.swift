@@ -96,7 +96,7 @@ final class OutlineController: NSObject, NSOutlineViewDataSource, NSOutlineViewD
             cell.textField?.stringValue = doc.name(it)
             cell.imageView?.image = icon(it, doc)
             let e = it.entryValue
-            let dim = e.map { !$0.flags.isDisjoint(with: [.hardlinkSeen, .cloneSeen, .mountPoint, .skipped, .special]) } == true
+            let dim = e.map { !$0.flags.isDisjoint(with: [.hardlinkSeen, .cloneSeen, .mountPoint, .skipped, .special, .firmlinked]) } == true
             cell.textField?.textColor = e?.flags.contains(.unreadable) == true ? .systemRed : dim ? .secondaryLabelColor : .labelColor
             cell.toolTip = tip(e)
         case "dimensione":

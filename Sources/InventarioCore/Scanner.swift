@@ -62,6 +62,7 @@ public final class DiskScanner: @unchecked Sendable {
 
     /// Legge `path` e restituisce l'albero; nil se annullata o se `path` non è una cartella.
     public func scan(_ path: String) -> Tree? {
+        treeRoot = path
         let root = Folder(parent: nil, index: -1)
         guard run(root, path), !isCancelled else { return nil }
         let tree = Tree(root: root, rootPath: path, extensions: registry)
@@ -75,6 +76,7 @@ public final class DiskScanner: @unchecked Sendable {
     /// I file con più nomi contati fuori dalla cartella restano contati là; quelli dentro si
     /// contano di nuovo. `Tree.replace` prende poi l'elenco nuovo.
     public func rescan(_ folder: Folder, in tree: Tree) -> Folder? {
+        treeRoot = tree.rootPath
         let fresh = Folder(parent: nil, index: folder.index)
         let outside = tree.hardlinks.filter { !$0.value.isInside(folder) }
         hardlinks.withLock { $0 = outside }
@@ -82,6 +84,28 @@ public final class DiskScanner: @unchecked Sendable {
         fresh.hardlinks = hardlinks.withLock { $0 }
         return fresh
     }
+
+    // MARK: il volume dei dati
+
+    /// la cartella di partenza dell'albero (anche quando se ne rilegge una parte)
+    private var treeRoot = ""
+
+    /// Da «/» si arriva al volume dei dati per i firmlink (/Users, /Applications…), ma non a
+    /// tutto: «macOS Install Data», .Spotlight-V100 e altre cartelle stanno solo lì. Allora,
+    /// quando l'albero comprende /System/Volumes/Data, lo leggiamo come una cartella qualunque,
+    /// saltando solo le cartelle dove portano i firmlink, che sono già contate dall'altra parte.
+    private var includesDataVolume: Bool { ["/", "/System", "/System/Volumes"].contains(treeRoot) }
+
+    private static let dataVolume = "/System/Volumes/Data"
+
+    /// dove portano i firmlink, nel volume dei dati (da /usr/share/firmlinks: «/Users\tUsers»)
+    private static let firmlinkTargets: Set<String> = {
+        guard let text = try? String(contentsOfFile: "/usr/share/firmlinks", encoding: .utf8) else { return [] }
+        return Set(text.split(separator: "\n").compactMap { line in
+            let parts = line.split(separator: "\t")
+            return parts.count == 2 ? dataVolume + "/" + parts[1] : nil
+        })
+    }()
 
     private func run(_ root: Folder, _ path: String) -> Bool {
         // la radice la apriamo anche se è un collegamento simbolico (/tmp)
@@ -196,7 +220,8 @@ public final class DiskScanner: @unchecked Sendable {
         // è lo stesso per il volume di sistema e quello dei dati: chiediamo dove è montato.
         // I firmlink (/Users, /Applications…) portano dentro il volume dei dati ma non sono il
         // suo punto di montaggio, quindi si seguono.
-        if folder.parent != nil && !(options.crossVolumes && !path.hasPrefix("/System/Volumes/")) {
+        if folder.parent != nil && !(options.crossVolumes && !path.hasPrefix("/System/Volumes/"))
+            && !(includesDataVolume && path == Self.dataVolume) {
             var fs = statfs()
             if fstatfs(fd, &fs) == 0 && Self.mountedAt(fs, path) {
                 folder.mountPoint = true
@@ -214,6 +239,8 @@ public final class DiskScanner: @unchecked Sendable {
         al.forkattr = Self.ATTR_CMNEXT_PRIVATESIZE | Self.ATTR_CMNEXT_CLONEID | Self.ATTR_CMNEXT_EXT_FLAGS
 
         let base = path.hasSuffix("/") ? path : path + "/"
+        // dentro il volume dei dati (letto da «/»), le cartelle dei firmlink sono già contate
+        let checkFirmlinks = includesDataVolume && (path == Self.dataVolume || path.hasPrefix(Self.dataVolume + "/"))
         var files = 0
         var bytes: UInt64 = 0
         while true {
@@ -266,9 +293,15 @@ public final class DiskScanner: @unchecked Sendable {
                         mounted = field.loadUnaligned(as: UInt32.self) & Self.DIR_MNTSTATUS_MNTPOINT != 0
                         field += 4
                     }
+                    let childPath = checkFirmlinks || mounted ? base + String(decoding: name, as: UTF8.self) : ""
+                    if mounted && includesDataVolume && childPath == Self.dataVolume {
+                        mounted = false
+                    }
                     if mounted && !(options.crossVolumes && !base.hasPrefix("/System/Volumes/")) {
                         // un altro volume: resta una cartella vuota, come nell'originale
                         entry.flags.insert(.mountPoint)
+                    } else if checkFirmlinks && Self.firmlinkTargets.contains(childPath) {
+                        entry.flags.insert(.firmlinked)
                     } else if !options.skipNames.isEmpty && options.skipNames.contains(String(decoding: name, as: UTF8.self)) {
                         entry.flags.insert(.skipped)
                     } else {
