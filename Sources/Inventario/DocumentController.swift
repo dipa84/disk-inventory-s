@@ -102,16 +102,14 @@ final class DocumentController: NSWindowController, NSWindowDelegate, NSToolbarD
         treemap.reload()
         let seconds = Double(elapsed.components.seconds) + Double(elapsed.components.attoseconds) / 1e18
         readIn = String(format: "%.1f s", seconds)
-        if unreadable > 0 {
-            notice.title = L(one: "%@ cartella non leggibile…", other: "%@ cartelle non leggibili…", unreadable, Format.count(unreadable))
-            notice.isHidden = false
-        }
+        updateNotice()
         setDefaultStatus()
         updateStatus()
         updateToolbar()
         window?.makeFirstResponder(treemap)
         if let photo = ProcessInfo.processInfo.environment["INVENTARIO_FOTO"] {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in self?.photograph(to: photo) }
+            let wait = Double(ProcessInfo.processInfo.environment["INVENTARIO_ATTESA"] ?? "") ?? 1
+            DispatchQueue.main.asyncAfter(deadline: .now() + wait) { [weak self] in self?.photograph(to: photo) }
         }
     }
 
@@ -119,8 +117,15 @@ final class DocumentController: NSWindowController, NSWindowDelegate, NSToolbarD
     private func photograph(to path: String) {
         if let action = ProcessInfo.processInfo.environment["INVENTARIO_AZIONE"] {
             for a in action.split(separator: ",") { perform(Selector(String(a) + ":"), with: nil) }
-            window?.displayIfNeeded()
+            // le azioni che lavorano in sottofondo (leggere le cartelle di sistema) hanno tempo di finire
+            DispatchQueue.main.asyncAfter(deadline: .now() + 4) { [weak self] in self?.snapshot(to: path) }
+            return
         }
+        snapshot(to: path)
+    }
+
+    private func snapshot(to path: String) {
+        window?.displayIfNeeded()
         guard let view = window?.contentView?.superview, let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { return }
         view.cacheDisplay(in: view.bounds, to: rep)
         try? rep.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: path))
@@ -166,9 +171,8 @@ final class DocumentController: NSWindowController, NSWindowDelegate, NSToolbarD
         notice.bezelStyle = .inline
         notice.controlSize = .small
         notice.target = self
-        notice.action = #selector(openPrivacySettings)
+        notice.action = #selector(noticeClicked)
         notice.isHidden = true
-        notice.toolTip = L("Per leggere tutto, Disk Inventory S ha bisogno dell'Accesso completo al disco (Impostazioni di Sistema › Privacy e sicurezza).")
         let bar = NSStackView(views: [status, notice])
         bar.orientation = .horizontal
         bar.edgeInsets = NSEdgeInsets(top: 4, left: 10, bottom: 4, right: 10)
@@ -216,6 +220,100 @@ final class DocumentController: NSWindowController, NSWindowDelegate, NSToolbarD
 
     @objc private func openPrivacySettings() {
         NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles")!)
+    }
+
+    // MARK: le cartelle che non si lasciano leggere
+
+    /// già provato a leggerle con la password: quelle che restano sono private (privacy)
+    private var readAsAdmin = false
+    private var readingAsAdmin = false
+
+    /// Il pulsante in fondo: prima legge le cartelle di sistema con la password, poi (per quelle
+    /// che restano, protette dalla privacy) apre l'Accesso completo al disco.
+    private func updateNotice() {
+        guard let doc = model else { return }
+        let n = doc.unreadFolders.count
+        notice.isHidden = n == 0
+        if readingAsAdmin {
+            notice.title = L("Leggo le cartelle di sistema…")
+            notice.isEnabled = false
+            return
+        }
+        notice.isEnabled = true
+        if !readAsAdmin {
+            notice.title = L(one: "%@ cartella non letta — Leggi…", other: "%@ cartelle non lette — Leggi…", n, Format.count(n))
+            notice.toolTip = L("Sono cartelle di sistema che un'app non può leggere. Disk Inventory S le legge con la password da amministratore, senza cambiare niente.")
+        } else {
+            notice.title = L(one: "%@ cartella privata non letta…", other: "%@ cartelle private non lette…", n, Format.count(n))
+            notice.toolTip = L("Per leggere tutto, Disk Inventory S ha bisogno dell'Accesso completo al disco (Impostazioni di Sistema › Privacy e sicurezza).")
+        }
+    }
+
+    /// per le prove (INVENTARIO_AZIONE=leggiCartelleDiSistema)
+    @objc func leggiCartelleDiSistema(_ sender: Any?) { readSystemFolders() }
+
+    @objc private func noticeClicked() {
+        if readAsAdmin { openPrivacySettings() } else { readSystemFolders() }
+    }
+
+    /// Fa leggere le cartelle non lette al programma d'aiuto (inventario-cli esporta), con i
+    /// permessi da amministratore: macOS chiede la password. Poi le mette nell'albero.
+    private func readSystemFolders() {
+        guard let doc = model, !doc.unreadFolders.isEmpty, !readingAsAdmin,
+              let helper = Bundle.main.path(forAuxiliaryExecutable: "inventario-cli") else { return }
+        let tree = doc.tree
+        let folders = doc.unreadFolders
+        let paths = folders.map { tree.path(of: $0) }
+        let dir = FileManager.default.temporaryDirectory
+        let list = dir.appendingPathComponent("disk-inventory-s-\(getpid())-elenco.txt")
+        let out = dir.appendingPathComponent("disk-inventory-s-\(getpid())-cartelle.bin")
+        try? FileManager.default.removeItem(at: out)
+        guard (try? (paths.joined(separator: "\n") + "\n").write(to: list, atomically: true, encoding: .utf8)) != nil else { return }
+        func quoted(_ s: String) -> String { "'" + s.replacingOccurrences(of: "'", with: "'\\''") + "'" }
+        let shell = [helper, "esporta", list.path, out.path].map(quoted).joined(separator: " ")
+        func literal(_ s: String) -> String { "\"" + s.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"") + "\"" }
+        let prompt = L("Disk Inventory S vuole leggere le cartelle di sistema che un'app non può aprire. Le legge soltanto, senza cambiare niente.")
+        let script = "do shell script \(literal(shell)) with administrator privileges with prompt \(literal(prompt))"
+        // per le prove: il programma d'aiuto senza password (legge solo quello che legge l'utente)
+        let withoutPassword = ProcessInfo.processInfo.environment["INVENTARIO_SENZA_PASSWORD"] != nil
+        readingAsAdmin = true
+        updateNotice()
+        let mode = doc.mode
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            let p = Process()
+            p.executableURL = URL(fileURLWithPath: withoutPassword ? "/bin/sh" : "/usr/bin/osascript")
+            p.arguments = withoutPassword ? ["-c", shell] : ["-e", script]
+            p.standardOutput = FileHandle.nullDevice
+            p.standardError = FileHandle.nullDevice
+            var ok = false
+            if (try? p.run()) != nil {
+                p.waitUntilExit()
+                ok = p.terminationStatus == 0
+            }
+            let data = ok ? try? Data(contentsOf: out) : nil
+            let read = data.flatMap { FolderExport.read($0, registry: tree.extensions, mode: mode) }
+            try? FileManager.default.removeItem(at: list)
+            try? FileManager.default.removeItem(at: out)
+            DispatchQueue.main.async {
+                guard let self else { return }
+                self.readingAsAdmin = false
+                // annullato (niente password): si può riprovare
+                guard let read else {
+                    self.updateNotice()
+                    return
+                }
+                self.readAsAdmin = true
+                for (folder, path) in zip(folders, paths) {
+                    if let fresh = read[path] { tree.replace(folder: folder, with: fresh) }
+                }
+                let updated = Document(tree: tree, space: doc.space)
+                updated.openPackages = doc.openPackages
+                self.model = updated
+                self.selection = nil
+                self.changed()
+                self.updateNotice()
+            }
+        }
     }
 
     func windowWillClose(_ notification: Notification) {

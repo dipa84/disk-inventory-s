@@ -1,11 +1,16 @@
 /* generato da tools/traduzioni.py: non modificare a mano */
 
-"%@ cartella non leggibile…" = "%@ unreadable folder…";
-"%@ cartelle non leggibili…" = "%@ unreadable folders…";
 "%@ file, %@" = "%@ file, %@";
 "%@ file, %@ (molti)" = "%@ files, %@";
 "letti in %@" = "read in %@";
+"Leggo le cartelle di sistema…" = "Reading system folders…";
+"%@ cartella non letta — Leggi…" = "%@ folder not read — Read…";
+"%@ cartelle non lette — Leggi…" = "%@ folders not read — Read…";
+"Sono cartelle di sistema che un'app non può leggere. Disk Inventory S le legge con la password da amministratore, senza cambiare niente." = "These are system folders an app can’t read. Disk Inventory S reads them with the administrator password, without changing anything.";
+"%@ cartella privata non letta…" = "%@ private folder not read…";
+"%@ cartelle private non lette…" = "%@ private folders not read…";
 "Per leggere tutto, Disk Inventory S ha bisogno dell'Accesso completo al disco (Impostazioni di Sistema › Privacy e sicurezza)." = "To read everything, Disk Inventory S needs Full Disk Access (System Settings › Privacy & Security).";
+"Disk Inventory S vuole leggere le cartelle di sistema che un'app non può aprire. Le legge soltanto, senza cambiare niente." = "Disk Inventory S wants to read the system folders an app can’t open. It only reads them, without changing anything.";
 "%@ file" = "%@ file";
 "%@ file (molti)" = "%@ files";
 "Spostare «%@» nel Cestino?" = "Move “%@” to the Trash?";
@@ -36,9 +41,11 @@
 "File" = "Files";
 "lo spazio ancora disponibile" = "the space still available";
 "memoria virtuale, Preboot, Recovery, aggiornamenti di macOS" = "virtual memory, Preboot, Recovery, macOS updates";
-"cartelle protette, istantanee di Time Machine, dati del file system" = "protected folders, Time Machine snapshots, file system data";
+"gli indici e le tabelle del file system" = "the file system’s indexes and tables";
+"lo spazio delle cartelle che non si sono lasciate leggere" = "the space of the folders that couldn’t be read";
 "non leggibile: serve l'Accesso completo al disco" = "unreadable: needs Full Disk Access";
 "un altro volume: non è contato qui" = "another volume: not counted here";
+"è la stessa cartella che si vede da / (firmlink): contata là" = "the same folder seen from / (firmlink): counted there";
 "saltata (Impostazioni › Scansione)" = "skipped (Settings › Scan)";
 "un altro nome di un file già contato altrove" = "another name of a file already counted elsewhere";
 "un clone: conta solo quello che ha di suo" = "a clone: only its own data counts";
@@ -85,7 +92,8 @@
 "Quando leggo un disco intero, mostra anche lo spazio che non è nei file" = "When reading a whole disk, also show the space that isn’t in files";
 "lo spazio ancora disponibile." = "the space still available.";
 "gli altri volumi dello stesso disco: memoria virtuale, Preboot, Recovery, aggiornamenti di macOS." = "the disk’s other volumes: virtual memory, Preboot, Recovery, macOS updates.";
-"occupato ma non leggibile come file: cartelle protette (con l'Accesso completo al disco diventa più piccolo), istantanee di Time Machine, dati del file system." = "used but not readable as files: protected folders (it shrinks with Full Disk Access), Time Machine snapshots, file system data.";
+"le cartelle che non si sono lasciate leggere: quelle di sistema si leggono col pulsante in fondo alla finestra (chiede la password), quelle private con l'Accesso completo al disco." = "the folders that couldn’t be read: system ones are read with the button at the bottom of the window (it asks for the password), private ones with Full Disk Access.";
+"quando si è letto tutto, quello che resta: gli indici e le tabelle del file system." = "once everything has been read, what remains: the file system’s indexes and tables.";
 "Conta come libero anche lo spazio eliminabile, come il Finder" = "Count purgeable space as free too, like the Finder";
 "Lo spazio eliminabile (cache, copie locali di iCloud) il sistema lo libera da sé quando serve." = "The system frees purgeable space (caches, local iCloud copies) by itself when needed.";
 "Leggi" = "Read";
@@ -123,4 +131,5 @@
 "File .%@" = ".%@ File";
 "Spazio libero" = "Free Space";
 "Volumi di sistema" = "System Volumes";
-"Spazio nascosto" = "Hidden Space";
+"Cartelle non lette" = "Folders Not Read";
+"Dati del file system" = "File System Data";

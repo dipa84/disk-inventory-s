@@ -77,13 +77,14 @@ struct VolumeSpace {
     }
 
     /// Le voci da mettere nella mappa, dato quanto ha contato la scansione.
-    func spaces(counted: UInt64, includePurgeable: Bool) -> [(Tree.Space, UInt64)] {
+    /// `unread`: ci sono cartelle non lette (allora il resto è loro, più i dati del file system)
+    func spaces(counted: UInt64, includePurgeable: Bool, unread: Bool) -> [(Tree.Space, UInt64)] {
         let free = includePurgeable ? self.free + purgeable : self.free
         let system = self.system ?? 0
         let used = free + system + counted
         var result: [(Tree.Space, UInt64)] = [(.free, free)]
         if system > 0 { result.append((.system, system)) }
-        if total > used { result.append((.hidden, total - used)) }
+        if total > used { result.append((unread ? .unread : .filesystem, total - used)) }
         return result
     }
 }

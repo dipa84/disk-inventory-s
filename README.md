@@ -49,16 +49,23 @@ Scegliere un tipo di file nell'elenco in basso lo mette in evidenza nella mappa.
 
 ## Lo spazio che non è nei file
 
-Leggendo un disco intero, la mappa mostra anche tre voci che non sono file:
+Leggendo un disco intero, la mappa mostra anche le voci che non sono file:
 
-- **Spazio libero**: quello ancora disponibile (con lo spazio eliminabile, come il Finder, se
-  non lo si toglie nelle impostazioni);
+- **Spazio libero**: quello ancora disponibile (lo spazio eliminabile si può aggiungere nelle
+  impostazioni, ma conta due volte i file di iCloud che sono anche nella mappa);
 - **Volumi di sistema**: gli altri volumi dello stesso contenitore APFS (memoria virtuale,
   Preboot, Recovery, aggiornamenti), misurati uno per uno con `diskutil apfs list`;
-- **Spazio nascosto**: il resto, occupato ma non leggibile come file: cartelle protette (con
-  l'Accesso completo al disco diventa più piccolo), istantanee di Time Machine, metadati.
+- **Cartelle non lette**: lo spazio delle cartelle che un'app non può aprire. Quelle di sistema
+  (l'indice di Spotlight, le versioni dei documenti, `/private/var/db`…) appartengono a root:
+  il pulsante in fondo alla finestra le fa leggere al programma d'aiuto (`inventario-cli
+  esporta`, dentro l'app) con la password da amministratore, in sola lettura, e le mette nella
+  mappa coi loro nomi. Quelle private (Posta, Messaggi…) chiedono l'Accesso completo al disco;
+- **Dati del file system**: quando si è letto tutto, quello che resta (indici e tabelle di APFS).
 
-L'originale le metteva insieme in «Other space».
+Leggendo «/» si legge anche il volume dei dati (`/System/Volumes/Data`), saltando le cartelle dove
+portano i firmlink, già contate da «/»: ci sono cose che stanno solo lì, come `macOS Install Data`.
+
+L'originale metteva tutto questo in un «Other space».
 
 ## Impostazioni (⌘,)
 

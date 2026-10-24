@@ -1,11 +1,16 @@
 /* generato da tools/traduzioni.py: non modificare a mano */
 
-"%@ cartella non leggibile…" = "%@ 个文件夹无法读取…";
-"%@ cartelle non leggibili…" = "%@ 个文件夹无法读取…";
 "%@ file, %@" = "%@ 个文件，%@";
 "%@ file, %@ (molti)" = "%@ 个文件，%@";
 "letti in %@" = "用时 %@";
+"Leggo le cartelle di sistema…" = "正在读取系统文件夹…";
+"%@ cartella non letta — Leggi…" = "%@ 个文件夹未读取 — 读取…";
+"%@ cartelle non lette — Leggi…" = "%@ 个文件夹未读取 — 读取…";
+"Sono cartelle di sistema che un'app non può leggere. Disk Inventory S le legge con la password da amministratore, senza cambiare niente." = "这些是应用无法读取的系统文件夹。Disk Inventory S 会使用管理员密码读取它们，不做任何更改。";
+"%@ cartella privata non letta…" = "%@ 个私有文件夹未读取…";
+"%@ cartelle private non lette…" = "%@ 个私有文件夹未读取…";
 "Per leggere tutto, Disk Inventory S ha bisogno dell'Accesso completo al disco (Impostazioni di Sistema › Privacy e sicurezza)." = "要读取全部内容，Disk Inventory S 需要“完全磁盘访问权限”（系统设置 › 隐私与安全性）。";
+"Disk Inventory S vuole leggere le cartelle di sistema che un'app non può aprire. Le legge soltanto, senza cambiare niente." = "Disk Inventory S 想要读取应用无法打开的系统文件夹。它只读取，不做任何更改。";
 "%@ file" = "%@ 个文件";
 "%@ file (molti)" = "%@ 个文件";
 "Spostare «%@» nel Cestino?" = "要将“%@”移到废纸篓吗？";
@@ -36,9 +41,11 @@
 "File" = "文件";
 "lo spazio ancora disponibile" = "仍然可用的空间";
 "memoria virtuale, Preboot, Recovery, aggiornamenti di macOS" = "虚拟内存、Preboot、Recovery、macOS 更新";
-"cartelle protette, istantanee di Time Machine, dati del file system" = "受保护的文件夹、时间机器快照、文件系统数据";
+"gli indici e le tabelle del file system" = "文件系统的索引和表";
+"lo spazio delle cartelle che non si sono lasciate leggere" = "无法读取的文件夹所占的空间";
 "non leggibile: serve l'Accesso completo al disco" = "无法读取：需要“完全磁盘访问权限”";
 "un altro volume: non è contato qui" = "另一个宗卷：不在此处计算";
+"è la stessa cartella che si vede da / (firmlink): contata là" = "与从 / 看到的是同一个文件夹（固定链接）：在那里计算";
 "saltata (Impostazioni › Scansione)" = "已跳过（设置 › 扫描）";
 "un altro nome di un file già contato altrove" = "已在别处计算的文件的另一个名称";
 "un clone: conta solo quello che ha di suo" = "克隆：只计算其独有的数据";
@@ -85,7 +92,8 @@
 "Quando leggo un disco intero, mostra anche lo spazio che non è nei file" = "读取整个磁盘时，也显示不在文件中的空间";
 "lo spazio ancora disponibile." = "仍然可用的空间。";
 "gli altri volumi dello stesso disco: memoria virtuale, Preboot, Recovery, aggiornamenti di macOS." = "同一磁盘上的其他宗卷：虚拟内存、Preboot、Recovery、macOS 更新。";
-"occupato ma non leggibile come file: cartelle protette (con l'Accesso completo al disco diventa più piccolo), istantanee di Time Machine, dati del file system." = "已占用但无法作为文件读取：受保护的文件夹（获得“完全磁盘访问权限”后会变小）、时间机器快照、文件系统数据。";
+"le cartelle che non si sono lasciate leggere: quelle di sistema si leggono col pulsante in fondo alla finestra (chiede la password), quelle private con l'Accesso completo al disco." = "无法读取的文件夹：系统文件夹可通过窗口底部的按钮读取（需要密码），私有文件夹需要“完全磁盘访问权限”。";
+"quando si è letto tutto, quello che resta: gli indici e le tabelle del file system." = "全部读取后剩下的部分：文件系统的索引和表。";
 "Conta come libero anche lo spazio eliminabile, come il Finder" = "将可清除空间也算作可用，与访达一致";
 "Lo spazio eliminabile (cache, copie locali di iCloud) il sistema lo libera da sé quando serve." = "系统会在需要时自行释放可清除空间（缓存、iCloud 本地副本）。";
 "Leggi" = "读取";
@@ -123,4 +131,5 @@
 "File .%@" = ".%@ 文件";
 "Spazio libero" = "可用空间";
 "Volumi di sistema" = "系统宗卷";
-"Spazio nascosto" = "隐藏空间";
+"Cartelle non lette" = "未读取的文件夹";
+"Dati del file system" = "文件系统数据";

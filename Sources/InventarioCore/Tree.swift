@@ -213,14 +213,17 @@ public final class Tree: @unchecked Sendable {
         case free = 1
         /// gli altri volumi dello stesso contenitore APFS: memoria virtuale, Preboot, Recovery…
         case system = 2
-        /// occupato ma non contato: cartelle protette, istantanee di Time Machine, metadati
-        case hidden = 3
+        /// occupato ma non contato, quando ci sono cartelle che non si sono lasciate leggere
+        case unread = 3
+        /// occupato ma non contato, quando si è letto tutto: i dati propri del file system
+        case filesystem = 4
 
         public var name: String {
             switch self {
             case .free: L("Spazio libero")
             case .system: L("Volumi di sistema")
-            case .hidden: L("Spazio nascosto")
+            case .unread: L("Cartelle non lette")
+            case .filesystem: L("Dati del file system")
             }
         }
     }

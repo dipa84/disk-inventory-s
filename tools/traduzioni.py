@@ -18,8 +18,6 @@ LINGUE = ["en", "es", "fr", "de", "zh-Hans", "ja"]
 # frase italiana: (inglese, spagnolo, francese, tedesco, cinese semplificato, giapponese)
 T = {
     # la barra in basso
-    "%@ cartella non leggibile…": ("%@ unreadable folder…", "%@ carpeta no legible…", "%@ dossier illisible…", "%@ nicht lesbarer Ordner …", "%@ 个文件夹无法读取…", "読み取れないフォルダ %@ 個…"),
-    "%@ cartelle non leggibili…": ("%@ unreadable folders…", "%@ carpetas no legibles…", "%@ dossiers illisibles…", "%@ nicht lesbare Ordner …", "%@ 个文件夹无法读取…", "読み取れないフォルダ %@ 個…"),
     "%@ file, %@": ("%@ file, %@", "%@ archivo, %@", "%@ fichier, %@", "%@ Datei, %@", "%@ 个文件，%@", "%@ 個のファイル、%@"),
     "%@ file, %@ (molti)": ("%@ files, %@", "%@ archivos, %@", "%@ fichiers, %@", "%@ Dateien, %@", "%@ 个文件，%@", "%@ 個のファイル、%@"),
     "letti in %@": ("read in %@", "leídos en %@", "lus en %@", "gelesen in %@", "用时 %@", "読み込み %@"),
@@ -33,6 +31,45 @@ T = {
     "%@ file": ("%@ file", "%@ archivo", "%@ fichier", "%@ Datei", "%@ 个文件", "%@ 個のファイル"),
     "%@ file (molti)": ("%@ files", "%@ archivos", "%@ fichiers", "%@ Dateien", "%@ 个文件", "%@ 個のファイル"),
     "Rileggo %@…": ("Rereading %@…", "Volviendo a leer %@…", "Relecture de %@…", "%@ wird neu gelesen …", "正在重新读取 %@…", "%@ を再読み込み中…"),
+
+    # le cartelle non lette e la password
+    "Leggo le cartelle di sistema…": ("Reading system folders…", "Leyendo las carpetas del sistema…", "Lecture des dossiers système…", "Systemordner werden gelesen …", "正在读取系统文件夹…", "システムフォルダを読み込み中…"),
+    "%@ cartella non letta — Leggi…": ("%@ folder not read — Read…", "%@ carpeta no leída — Leer…", "%@ dossier non lu — Lire…", "%@ Ordner nicht gelesen – Lesen …", "%@ 个文件夹未读取 — 读取…", "未読のフォルダ %@ 個 — 読み込む…"),
+    "%@ cartelle non lette — Leggi…": ("%@ folders not read — Read…", "%@ carpetas no leídas — Leer…", "%@ dossiers non lus — Lire…", "%@ Ordner nicht gelesen – Lesen …", "%@ 个文件夹未读取 — 读取…", "未読のフォルダ %@ 個 — 読み込む…"),
+    "Sono cartelle di sistema che un'app non può leggere. Disk Inventory S le legge con la password da amministratore, senza cambiare niente.": (
+        "These are system folders an app can’t read. Disk Inventory S reads them with the administrator password, without changing anything.",
+        "Son carpetas del sistema que una app no puede leer. Disk Inventory S las lee con la contraseña de administrador, sin cambiar nada.",
+        "Ce sont des dossiers système qu’une app ne peut pas lire. Disk Inventory S les lit avec le mot de passe administrateur, sans rien modifier.",
+        "Das sind Systemordner, die eine App nicht lesen kann. Disk Inventory S liest sie mit dem Administratorpasswort, ohne etwas zu ändern.",
+        "这些是应用无法读取的系统文件夹。Disk Inventory S 会使用管理员密码读取它们，不做任何更改。",
+        "アプリが読み込めないシステムフォルダです。Disk Inventory S は管理者パスワードを使って読み込むだけで、何も変更しません。"),
+    "%@ cartella privata non letta…": ("%@ private folder not read…", "%@ carpeta privada no leída…", "%@ dossier privé non lu…", "%@ privater Ordner nicht gelesen …", "%@ 个私有文件夹未读取…", "未読のプライベートフォルダ %@ 個…"),
+    "%@ cartelle private non lette…": ("%@ private folders not read…", "%@ carpetas privadas no leídas…", "%@ dossiers privés non lus…", "%@ private Ordner nicht gelesen …", "%@ 个私有文件夹未读取…", "未読のプライベートフォルダ %@ 個…"),
+    "Disk Inventory S vuole leggere le cartelle di sistema che un'app non può aprire. Le legge soltanto, senza cambiare niente.": (
+        "Disk Inventory S wants to read the system folders an app can’t open. It only reads them, without changing anything.",
+        "Disk Inventory S quiere leer las carpetas del sistema que una app no puede abrir. Solo las lee, sin cambiar nada.",
+        "Disk Inventory S souhaite lire les dossiers système qu’une app ne peut pas ouvrir. Il les lit seulement, sans rien modifier.",
+        "Disk Inventory S möchte die Systemordner lesen, die eine App nicht öffnen kann. Es liest sie nur und ändert nichts.",
+        "Disk Inventory S 想要读取应用无法打开的系统文件夹。它只读取，不做任何更改。",
+        "Disk Inventory S が、アプリでは開けないシステムフォルダを読み込もうとしています。読み込むだけで、何も変更しません。"),
+    "gli indici e le tabelle del file system": ("the file system’s indexes and tables", "los índices y tablas del sistema de archivos", "les index et tables du système de fichiers", "die Indizes und Tabellen des Dateisystems", "文件系统的索引和表", "ファイルシステムのインデックスとテーブル"),
+    "lo spazio delle cartelle che non si sono lasciate leggere": ("the space of the folders that couldn’t be read", "el espacio de las carpetas que no se han podido leer", "l’espace des dossiers qui n’ont pas pu être lus", "der Platz der Ordner, die nicht gelesen werden konnten", "无法读取的文件夹所占的空间", "読み込めなかったフォルダの領域"),
+    "le cartelle che non si sono lasciate leggere: quelle di sistema si leggono col pulsante in fondo alla finestra (chiede la password), quelle private con l'Accesso completo al disco.": (
+        "the folders that couldn’t be read: system ones are read with the button at the bottom of the window (it asks for the password), private ones with Full Disk Access.",
+        "las carpetas que no se han podido leer: las del sistema se leen con el botón de abajo de la ventana (pide la contraseña), las privadas con Acceso total al disco.",
+        "les dossiers qui n’ont pas pu être lus : les dossiers système se lisent avec le bouton en bas de la fenêtre (il demande le mot de passe), les dossiers privés avec l’accès complet au disque.",
+        "die Ordner, die nicht gelesen werden konnten: Systemordner mit der Taste unten im Fenster (fragt nach dem Passwort), private mit dem Festplattenvollzugriff.",
+        "无法读取的文件夹：系统文件夹可通过窗口底部的按钮读取（需要密码），私有文件夹需要“完全磁盘访问权限”。",
+        "読み込めなかったフォルダ。システムフォルダはウインドウ下部のボタンで読み込めます（パスワードが必要）。プライベートフォルダにはフルディスクアクセスが必要です。"),
+    "quando si è letto tutto, quello che resta: gli indici e le tabelle del file system.": (
+        "once everything has been read, what remains: the file system’s indexes and tables.",
+        "cuando se ha leído todo, lo que queda: los índices y tablas del sistema de archivos.",
+        "une fois tout lu, ce qui reste : les index et tables du système de fichiers.",
+        "wenn alles gelesen ist, was übrig bleibt: die Indizes und Tabellen des Dateisystems.",
+        "全部读取后剩下的部分：文件系统的索引和表。",
+        "すべて読み込んだあとに残るもの：ファイルシステムのインデックスとテーブル。"),
+    "Cartelle non lette": ("Folders Not Read", "Carpetas no leídas", "Dossiers non lus", "Nicht gelesene Ordner", "未读取的文件夹", "未読のフォルダ"),
+    "Dati del file system": ("File System Data", "Datos del sistema de archivos", "Données du système de fichiers", "Dateisystemdaten", "文件系统数据", "ファイルシステムのデータ"),
 
     # il Cestino
     "Spostare «%@» nel Cestino?": ("Move “%@” to the Trash?", "¿Trasladar «%@» a la Papelera?", "Placer « %@ » dans la Corbeille ?", "„%@“ in den Papierkorb legen?", "要将“%@”移到废纸篓吗？", "“%@”をゴミ箱に入れますか？"),
@@ -74,7 +111,6 @@ T = {
     # le voci particolari
     "lo spazio ancora disponibile": ("the space still available", "el espacio aún disponible", "l’espace encore disponible", "der noch verfügbare Platz", "仍然可用的空间", "まだ使える領域"),
     "memoria virtuale, Preboot, Recovery, aggiornamenti di macOS": ("virtual memory, Preboot, Recovery, macOS updates", "memoria virtual, Preboot, Recovery, actualizaciones de macOS", "mémoire virtuelle, Preboot, Recovery, mises à jour de macOS", "virtueller Speicher, Preboot, Recovery, macOS-Updates", "虚拟内存、Preboot、Recovery、macOS 更新", "仮想メモリ、Preboot、Recovery、macOSアップデート"),
-    "cartelle protette, istantanee di Time Machine, dati del file system": ("protected folders, Time Machine snapshots, file system data", "carpetas protegidas, instantáneas de Time Machine, datos del sistema de archivos", "dossiers protégés, instantanés Time Machine, données du système de fichiers", "geschützte Ordner, Time Machine-Snapshots, Dateisystemdaten", "受保护的文件夹、时间机器快照、文件系统数据", "保護されたフォルダ、Time Machineのスナップショット、ファイルシステムのデータ"),
     "non leggibile: serve l'Accesso completo al disco": ("unreadable: needs Full Disk Access", "no legible: necesita Acceso total al disco", "illisible : nécessite l’accès complet au disque", "nicht lesbar: Festplattenvollzugriff nötig", "无法读取：需要“完全磁盘访问权限”", "読み取れません：フルディスクアクセスが必要です"),
     "un altro volume: non è contato qui": ("another volume: not counted here", "otro volumen: no se cuenta aquí", "un autre volume : non compté ici", "ein anderes Volume: hier nicht gezählt", "另一个宗卷：不在此处计算", "別のボリューム：ここでは数えません"),
     "è la stessa cartella che si vede da / (firmlink): contata là": ("the same folder seen from / (firmlink): counted there", "es la misma carpeta que se ve desde / (firmlink): contada allí", "c’est le même dossier vu depuis / (firmlink) : compté là-bas", "derselbe Ordner wie unter / (Firmlink): dort gezählt", "与从 / 看到的是同一个文件夹（固定链接）：在那里计算", "/ から見えるのと同じフォルダ（ファームリンク）：そちらで数えます"),
@@ -83,7 +119,6 @@ T = {
     "un clone: conta solo quello che ha di suo": ("a clone: only its own data counts", "un clon: solo cuenta lo que tiene de propio", "un clone : seul ce qui lui est propre compte", "ein Klon: zählt nur seine eigenen Daten", "克隆：只计算其独有的数据", "クローン：独自のデータだけを数えます"),
     "Spazio libero": ("Free Space", "Espacio libre", "Espace libre", "Freier Speicher", "可用空间", "空き領域"),
     "Volumi di sistema": ("System Volumes", "Volúmenes del sistema", "Volumes système", "Systemvolumes", "系统宗卷", "システムボリューム"),
-    "Spazio nascosto": ("Hidden Space", "Espacio oculto", "Espace caché", "Versteckter Speicher", "隐藏空间", "隠れた領域"),
     "File .%@": (".%@ File", "Archivo .%@", "Fichier .%@", ".%@-Datei", ".%@ 文件", ".%@ ファイル"),
 
     # le impostazioni
@@ -142,13 +177,6 @@ T = {
         "die anderen Volumes derselben Festplatte: virtueller Speicher, Preboot, Recovery, macOS-Updates.",
         "同一磁盘上的其他宗卷：虚拟内存、Preboot、Recovery、macOS 更新。",
         "同じディスクのほかのボリューム：仮想メモリ、Preboot、Recovery、macOSアップデート。"),
-    "occupato ma non leggibile come file: cartelle protette (con l'Accesso completo al disco diventa più piccolo), istantanee di Time Machine, dati del file system.": (
-        "used but not readable as files: protected folders (it shrinks with Full Disk Access), Time Machine snapshots, file system data.",
-        "ocupado pero no legible como archivos: carpetas protegidas (con Acceso total al disco se reduce), instantáneas de Time Machine, datos del sistema de archivos.",
-        "occupé mais illisible sous forme de fichiers : dossiers protégés (il diminue avec l’accès complet au disque), instantanés Time Machine, données du système de fichiers.",
-        "belegt, aber nicht als Dateien lesbar: geschützte Ordner (mit Festplattenvollzugriff wird er kleiner), Time Machine-Snapshots, Dateisystemdaten.",
-        "已占用但无法作为文件读取：受保护的文件夹（获得“完全磁盘访问权限”后会变小）、时间机器快照、文件系统数据。",
-        "使用中だがファイルとして読めない領域：保護されたフォルダ（フルディスクアクセスで小さくなります）、Time Machineのスナップショット、ファイルシステムのデータ。"),
     "Conta come libero anche lo spazio eliminabile, come il Finder": ("Count purgeable space as free too, like the Finder", "Contar también como libre el espacio purgable, como el Finder", "Compter aussi l’espace purgeable comme libre, comme le Finder", "Auch löschbaren Speicher als frei zählen, wie der Finder", "将可清除空间也算作可用，与访达一致", "パージ可能な領域も空きとして数える（Finderと同じ）"),
     "Lo spazio eliminabile (cache, copie locali di iCloud) il sistema lo libera da sé quando serve.": (
         "The system frees purgeable space (caches, local iCloud copies) by itself when needed.",

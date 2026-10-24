@@ -53,6 +53,8 @@ final class Document {
     let space: VolumeSpace?
     /// quanto ha contato la scansione: il resto dello spazio usato è nascosto
     private let counted: UInt64
+    /// le cartelle che non si sono lasciate leggere (permessi di sistema o privacy)
+    let unreadFolders: [Folder]
     var isVolume: Bool { space != nil }
     /// la tipologia scelta nell'elenco dei tipi: la mappa la mette in evidenza
     var highlightedKind: Int?
@@ -62,6 +64,13 @@ final class Document {
         self.space = space
         tree.setSpecialSpace([])
         counted = tree.root.alloc
+        var unread: [Folder] = []
+        var stack = [tree.root]
+        while let f = stack.popLast() {
+            if f.unreadable { unread.append(f) }
+            stack.append(contentsOf: f.subfolders)
+        }
+        unreadFolders = unread
         kinds = Kinds(extensions: tree.extensions.names)
         updateSpecialSpace()
         tally()
@@ -74,7 +83,7 @@ final class Document {
             tree.setSpecialSpace([])
             return
         }
-        tree.setSpecialSpace(space.spaces(counted: counted, includePurgeable: Prefs.purgeableIsFree))
+        tree.setSpecialSpace(space.spaces(counted: counted, includePurgeable: Prefs.purgeableIsFree, unread: !unreadFolders.isEmpty))
     }
 
     func isSpecial(_ item: Item) -> Bool { item.entryValue?.flags.contains(.special) == true }
@@ -85,7 +94,8 @@ final class Document {
             switch Tree.Space(rawValue: e.ext) {
             case .free?: return L("lo spazio ancora disponibile")
             case .system?: return L("memoria virtuale, Preboot, Recovery, aggiornamenti di macOS")
-            default: return L("cartelle protette, istantanee di Time Machine, dati del file system")
+            case .filesystem?: return L("gli indici e le tabelle del file system")
+            default: return L("lo spazio delle cartelle che non si sono lasciate leggere")
             }
         }
         if e.flags.contains(.unreadable) { return L("non leggibile: serve l'Accesso completo al disco") }

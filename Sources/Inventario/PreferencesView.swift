@@ -223,7 +223,8 @@ private struct SpacePane: View {
             VStack(alignment: .leading, spacing: 6) {
                 legend(Tree.Space.free, L("lo spazio ancora disponibile."))
                 legend(Tree.Space.system, L("gli altri volumi dello stesso disco: memoria virtuale, Preboot, Recovery, aggiornamenti di macOS."))
-                legend(Tree.Space.hidden, L("occupato ma non leggibile come file: cartelle protette (con l'Accesso completo al disco diventa più piccolo), istantanee di Time Machine, dati del file system."))
+                legend(Tree.Space.unread, L("le cartelle che non si sono lasciate leggere: quelle di sistema si leggono col pulsante in fondo alla finestra (chiede la password), quelle private con l'Accesso completo al disco."))
+                legend(Tree.Space.filesystem, L("quando si è letto tutto, quello che resta: gli indici e le tabelle del file system."))
             }
             .padding(.leading, 20)
             Toggle(L("Conta come libero anche lo spazio eliminabile, come il Finder"), isOn: $purgeable)

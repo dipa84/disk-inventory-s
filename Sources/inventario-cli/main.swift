@@ -7,6 +7,9 @@ import InventarioCore
 //      inventario-cli originale <cartella>          come la fa Disk Inventory X (un filo, NSURL)
 //      inventario-cli mappa <cartella> <file.png> [LxA]   la mappa in un'immagine, con i tempi
 //      inventario-cli icona <cartella.iconset>     l'icona: una piccola mappa a cuscino
+//      inventario-cli esporta <elenco> <uscita>     legge le cartelle dell'elenco (una per riga) e
+//                                                   le scrive per l'app: è il programma d'aiuto che
+//                                                   l'app lancia con la password da amministratore
 
 func seconds(_ start: ContinuousClock.Instant) -> String {
     let d = ContinuousClock.now - start
@@ -56,6 +59,21 @@ case "illeggibili":
             print(tree.path(of: f, entry: i))
         }
         stack.append(contentsOf: f.subfolders)
+    }
+case "esporta":
+    guard args.count >= 4, let list = try? String(contentsOfFile: args[2], encoding: .utf8) else { exit(2) }
+    var folders: [(path: String, folder: Folder)] = []
+    for p in list.split(separator: "\n").map(String.init) where !p.isEmpty {
+        if let tree = DiskScanner().scan(p) { folders.append((p, tree.root)) }
+    }
+    let out = URL(fileURLWithPath: args[3])
+    do {
+        try FolderExport.write(folders).write(to: out)
+        // chi l'ha chiesto deve poterlo leggere (qui siamo l'amministratore)
+        chmod(args[3], 0o644)
+    } catch {
+        print("non riesco a scrivere \(args[3]): \(error)")
+        exit(1)
     }
 case "originale":
     // le stesse chiavi che chiede FSItem.m, con NSDirectoryEnumerator, un filo solo

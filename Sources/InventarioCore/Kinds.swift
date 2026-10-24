@@ -67,7 +67,7 @@ public final class Kinds {
     }
 
     public func kind(of e: Entry) -> Int {
-        if e.flags.contains(.special) { return Int(spaceKinds[Tree.Space(rawValue: e.ext) ?? .hidden]!) }
+        if e.flags.contains(.special) { return Int(spaceKinds[Tree.Space(rawValue: e.ext) ?? .unread]!) }
         if e.isDirectory {
             let p = packageKind[Int(e.ext)]
             return Int(p >= 0 ? p : folderKind)
@@ -108,7 +108,8 @@ public final class Kinds {
         }
         kinds[Int(spaceKinds[.free]!)].color = [0.95, 0.95, 0.95]
         kinds[Int(spaceKinds[.system]!)].color = [0.45, 0.47, 0.55]
-        kinds[Int(spaceKinds[.hidden]!)].color = [0.25, 0.25, 0.25]
+        kinds[Int(spaceKinds[.unread]!)].color = [0.55, 0.15, 0.15]
+        kinds[Int(spaceKinds[.filesystem]!)].color = [0.25, 0.25, 0.25]
     }
 
     /// i tipi presenti, dal più grande

@@ -108,6 +108,24 @@ do {
     check(all.root.alloc > once.root.alloc + 2_000_000, "contando tutto, il clone e il collegamento fisso contano di nuovo")
 }
 
+// MARK: il formato del programma d'aiuto
+
+do {
+    let tree = DiskScanner().scan(base)!
+    let a = tree.root.subfolders.first { tree.path(of: $0).hasSuffix("/a") }!
+    let data = FolderExport.write([(base + "/a", a), (base, tree.root)])
+    let back = FolderExport.read(data, registry: tree.extensions, mode: .allocated)
+    check(back?.count == 2, "due cartelle tornano indietro")
+    if let a2 = back?[base + "/a"], let r2 = back?[base] {
+        check(a2.alloc == a.alloc && a2.logical == a.logical && a2.fileCount == a.fileCount, "a torna con le stesse somme")
+        check((0 ..< a.entries.count).map(a.name(at:)) == (0 ..< a2.entries.count).map(a2.name(at:)), "a torna con gli stessi nomi")
+        check(r2.logical == tree.root.logical && r2.fileCount == tree.root.fileCount, "la radice torna con le stesse somme")
+        let jpg = a2.entries.first { a2.name(at: Int(a2.entries.firstIndex(where: { _ in true })!)) != "" && $0.ext != 0 }
+        check(jpg != nil, "le estensioni si ricalcolano")
+    }
+    check(FolderExport.read(data.prefix(data.count - 3), registry: tree.extensions, mode: .allocated) == nil, "un file tagliato non passa")
+}
+
 // MARK: mappa
 
 do {

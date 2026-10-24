@@ -1,11 +1,16 @@
 /* generato da tools/traduzioni.py: non modificare a mano */
 
-"%@ cartella non leggibile…" = "読み取れないフォルダ %@ 個…";
-"%@ cartelle non leggibili…" = "読み取れないフォルダ %@ 個…";
 "%@ file, %@" = "%@ 個のファイル、%@";
 "%@ file, %@ (molti)" = "%@ 個のファイル、%@";
 "letti in %@" = "読み込み %@";
+"Leggo le cartelle di sistema…" = "システムフォルダを読み込み中…";
+"%@ cartella non letta — Leggi…" = "未読のフォルダ %@ 個 — 読み込む…";
+"%@ cartelle non lette — Leggi…" = "未読のフォルダ %@ 個 — 読み込む…";
+"Sono cartelle di sistema che un'app non può leggere. Disk Inventory S le legge con la password da amministratore, senza cambiare niente." = "アプリが読み込めないシステムフォルダです。Disk Inventory S は管理者パスワードを使って読み込むだけで、何も変更しません。";
+"%@ cartella privata non letta…" = "未読のプライベートフォルダ %@ 個…";
+"%@ cartelle private non lette…" = "未読のプライベートフォルダ %@ 個…";
 "Per leggere tutto, Disk Inventory S ha bisogno dell'Accesso completo al disco (Impostazioni di Sistema › Privacy e sicurezza)." = "すべてを読み込むには、Disk Inventory S に「フルディスクアクセス」が必要です（システム設定 › プライバシーとセキュリティ）。";
+"Disk Inventory S vuole leggere le cartelle di sistema che un'app non può aprire. Le legge soltanto, senza cambiare niente." = "Disk Inventory S が、アプリでは開けないシステムフォルダを読み込もうとしています。読み込むだけで、何も変更しません。";
 "%@ file" = "%@ 個のファイル";
 "%@ file (molti)" = "%@ 個のファイル";
 "Spostare «%@» nel Cestino?" = "“%@”をゴミ箱に入れますか？";
@@ -36,9 +41,11 @@
 "File" = "ファイル";
 "lo spazio ancora disponibile" = "まだ使える領域";
 "memoria virtuale, Preboot, Recovery, aggiornamenti di macOS" = "仮想メモリ、Preboot、Recovery、macOSアップデート";
-"cartelle protette, istantanee di Time Machine, dati del file system" = "保護されたフォルダ、Time Machineのスナップショット、ファイルシステムのデータ";
+"gli indici e le tabelle del file system" = "ファイルシステムのインデックスとテーブル";
+"lo spazio delle cartelle che non si sono lasciate leggere" = "読み込めなかったフォルダの領域";
 "non leggibile: serve l'Accesso completo al disco" = "読み取れません：フルディスクアクセスが必要です";
 "un altro volume: non è contato qui" = "別のボリューム：ここでは数えません";
+"è la stessa cartella che si vede da / (firmlink): contata là" = "/ から見えるのと同じフォルダ（ファームリンク）：そちらで数えます";
 "saltata (Impostazioni › Scansione)" = "スキップ（設定 › スキャン）";
 "un altro nome di un file già contato altrove" = "ほかの場所で数えたファイルの別名";
 "un clone: conta solo quello che ha di suo" = "クローン：独自のデータだけを数えます";
@@ -85,7 +92,8 @@
 "Quando leggo un disco intero, mostra anche lo spazio che non è nei file" = "ディスク全体を読み込むとき、ファイル以外の領域も表示する";
 "lo spazio ancora disponibile." = "まだ使える領域。";
 "gli altri volumi dello stesso disco: memoria virtuale, Preboot, Recovery, aggiornamenti di macOS." = "同じディスクのほかのボリューム：仮想メモリ、Preboot、Recovery、macOSアップデート。";
-"occupato ma non leggibile come file: cartelle protette (con l'Accesso completo al disco diventa più piccolo), istantanee di Time Machine, dati del file system." = "使用中だがファイルとして読めない領域：保護されたフォルダ（フルディスクアクセスで小さくなります）、Time Machineのスナップショット、ファイルシステムのデータ。";
+"le cartelle che non si sono lasciate leggere: quelle di sistema si leggono col pulsante in fondo alla finestra (chiede la password), quelle private con l'Accesso completo al disco." = "読み込めなかったフォルダ。システムフォルダはウインドウ下部のボタンで読み込めます（パスワードが必要）。プライベートフォルダにはフルディスクアクセスが必要です。";
+"quando si è letto tutto, quello che resta: gli indici e le tabelle del file system." = "すべて読み込んだあとに残るもの：ファイルシステムのインデックスとテーブル。";
 "Conta come libero anche lo spazio eliminabile, come il Finder" = "パージ可能な領域も空きとして数える（Finderと同じ）";
 "Lo spazio eliminabile (cache, copie locali di iCloud) il sistema lo libera da sé quando serve." = "パージ可能な領域（キャッシュ、iCloudのローカルコピー）は、必要なときにシステムが自動で解放します。";
 "Leggi" = "読み込む";
@@ -123,4 +131,5 @@
 "File .%@" = ".%@ ファイル";
 "Spazio libero" = "空き領域";
 "Volumi di sistema" = "システムボリューム";
-"Spazio nascosto" = "隠れた領域";
+"Cartelle non lette" = "未読のフォルダ";
+"Dati del file system" = "ファイルシステムのデータ";

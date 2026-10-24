@@ -1,11 +1,16 @@
 /* generato da tools/traduzioni.py: non modificare a mano */
 
-"%@ cartella non leggibile…" = "%@ carpeta no legible…";
-"%@ cartelle non leggibili…" = "%@ carpetas no legibles…";
 "%@ file, %@" = "%@ archivo, %@";
 "%@ file, %@ (molti)" = "%@ archivos, %@";
 "letti in %@" = "leídos en %@";
+"Leggo le cartelle di sistema…" = "Leyendo las carpetas del sistema…";
+"%@ cartella non letta — Leggi…" = "%@ carpeta no leída — Leer…";
+"%@ cartelle non lette — Leggi…" = "%@ carpetas no leídas — Leer…";
+"Sono cartelle di sistema che un'app non può leggere. Disk Inventory S le legge con la password da amministratore, senza cambiare niente." = "Son carpetas del sistema que una app no puede leer. Disk Inventory S las lee con la contraseña de administrador, sin cambiar nada.";
+"%@ cartella privata non letta…" = "%@ carpeta privada no leída…";
+"%@ cartelle private non lette…" = "%@ carpetas privadas no leídas…";
 "Per leggere tutto, Disk Inventory S ha bisogno dell'Accesso completo al disco (Impostazioni di Sistema › Privacy e sicurezza)." = "Para leerlo todo, Disk Inventory S necesita Acceso total al disco (Ajustes del Sistema › Privacidad y seguridad).";
+"Disk Inventory S vuole leggere le cartelle di sistema che un'app non può aprire. Le legge soltanto, senza cambiare niente." = "Disk Inventory S quiere leer las carpetas del sistema que una app no puede abrir. Solo las lee, sin cambiar nada.";
 "%@ file" = "%@ archivo";
 "%@ file (molti)" = "%@ archivos";
 "Spostare «%@» nel Cestino?" = "¿Trasladar «%@» a la Papelera?";
@@ -36,9 +41,11 @@
 "File" = "Archivos";
 "lo spazio ancora disponibile" = "el espacio aún disponible";
 "memoria virtuale, Preboot, Recovery, aggiornamenti di macOS" = "memoria virtual, Preboot, Recovery, actualizaciones de macOS";
-"cartelle protette, istantanee di Time Machine, dati del file system" = "carpetas protegidas, instantáneas de Time Machine, datos del sistema de archivos";
+"gli indici e le tabelle del file system" = "los índices y tablas del sistema de archivos";
+"lo spazio delle cartelle che non si sono lasciate leggere" = "el espacio de las carpetas que no se han podido leer";
 "non leggibile: serve l'Accesso completo al disco" = "no legible: necesita Acceso total al disco";
 "un altro volume: non è contato qui" = "otro volumen: no se cuenta aquí";
+"è la stessa cartella che si vede da / (firmlink): contata là" = "es la misma carpeta que se ve desde / (firmlink): contada allí";
 "saltata (Impostazioni › Scansione)" = "omitida (Ajustes › Análisis)";
 "un altro nome di un file già contato altrove" = "otro nombre de un archivo ya contado en otro lugar";
 "un clone: conta solo quello che ha di suo" = "un clon: solo cuenta lo que tiene de propio";
@@ -85,7 +92,8 @@
 "Quando leggo un disco intero, mostra anche lo spazio che non è nei file" = "Al leer un disco entero, mostrar también el espacio que no está en archivos";
 "lo spazio ancora disponibile." = "el espacio aún disponible.";
 "gli altri volumi dello stesso disco: memoria virtuale, Preboot, Recovery, aggiornamenti di macOS." = "los otros volúmenes del mismo disco: memoria virtual, Preboot, Recovery, actualizaciones de macOS.";
-"occupato ma non leggibile come file: cartelle protette (con l'Accesso completo al disco diventa più piccolo), istantanee di Time Machine, dati del file system." = "ocupado pero no legible como archivos: carpetas protegidas (con Acceso total al disco se reduce), instantáneas de Time Machine, datos del sistema de archivos.";
+"le cartelle che non si sono lasciate leggere: quelle di sistema si leggono col pulsante in fondo alla finestra (chiede la password), quelle private con l'Accesso completo al disco." = "las carpetas que no se han podido leer: las del sistema se leen con el botón de abajo de la ventana (pide la contraseña), las privadas con Acceso total al disco.";
+"quando si è letto tutto, quello che resta: gli indici e le tabelle del file system." = "cuando se ha leído todo, lo que queda: los índices y tablas del sistema de archivos.";
 "Conta come libero anche lo spazio eliminabile, come il Finder" = "Contar también como libre el espacio purgable, como el Finder";
 "Lo spazio eliminabile (cache, copie locali di iCloud) il sistema lo libera da sé quando serve." = "El sistema libera por sí mismo el espacio purgable (cachés, copias locales de iCloud) cuando hace falta.";
 "Leggi" = "Leer";
@@ -123,4 +131,5 @@
 "File .%@" = "Archivo .%@";
 "Spazio libero" = "Espacio libre";
 "Volumi di sistema" = "Volúmenes del sistema";
-"Spazio nascosto" = "Espacio oculto";
+"Cartelle non lette" = "Carpetas no leídas";
+"Dati del file system" = "Datos del sistema de archivos";
