@@ -147,7 +147,7 @@ final class DocumentController: NSWindowController, NSWindowDelegate, NSToolbarD
         notice.target = self
         notice.action = #selector(openPrivacySettings)
         notice.isHidden = true
-        notice.toolTip = "Per leggere tutto, Inventario ha bisogno dell'Accesso completo al disco (Impostazioni di Sistema › Privacy e sicurezza)."
+        notice.toolTip = "Per leggere tutto, Disk Inventory S ha bisogno dell'Accesso completo al disco (Impostazioni di Sistema › Privacy e sicurezza)."
         let bar = NSStackView(views: [status, notice])
         bar.orientation = .horizontal
         bar.edgeInsets = NSEdgeInsets(top: 4, left: 10, bottom: 4, right: 10)

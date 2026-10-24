@@ -3,11 +3,11 @@
 <plist version="1.0">
 <dict>
 	<key>CFBundleName</key>
-	<string>Inventario</string>
+	<string>Disk Inventory S</string>
 	<key>CFBundleDisplayName</key>
-	<string>Inventario</string>
+	<string>Disk Inventory S</string>
 	<key>CFBundleIdentifier</key>
-	<string>it.dipaola.inventario</string>
+	<string>it.dipaola.diskinventorys</string>
 	<key>CFBundleExecutable</key>
 	<string>Inventario</string>
 	<key>CFBundlePackageType</key>
@@ -31,7 +31,7 @@
 	<key>NSHighResolutionCapable</key>
 	<true/>
 	<key>NSHumanReadableCopyright</key>
-	<string>Da Disk Inventory X di Tjark Derlien. GPL 3.</string>
+	<string>Riscritto in Swift da Riccardo Di Paola (2026) a partire da Disk Inventory X di Tjark Derlien (2003–2022). GPL 3.</string>
 	<key>CFBundleDocumentTypes</key>
 	<array>
 		<dict>

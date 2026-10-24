@@ -74,7 +74,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 520, height: 420), styleMask: [.titled, .closable, .resizable],
                          backing: .buffered, defer: false)
-        w.title = "Inventario"
+        w.title = "Disk Inventory S"
         w.isReleasedWhenClosed = false
         w.contentView = NSHostingView(rootView: StartView(open: { [weak self] in self?.open(path: $0) },
                                                           choose: { [weak self] in self?.openFolder(nil) }))
@@ -101,14 +101,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let down = String(Character(UnicodeScalar(NSDownArrowFunctionKey)!))
         let backspace = String(Character(UnicodeScalar(NSBackspaceCharacter)!))
 
-        menu("Inventario", [
-            item("Informazioni su Inventario", #selector(NSApplication.orderFrontStandardAboutPanel(_:))),
+        menu("Disk Inventory S", [
+            item("Informazioni su Disk Inventory S", #selector(NSApplication.orderFrontStandardAboutPanel(_:))),
             .separator(),
-            item("Nascondi Inventario", #selector(NSApplication.hide(_:)), "h"),
+            item("Nascondi Disk Inventory S", #selector(NSApplication.hide(_:)), "h"),
             item("Nascondi altre", #selector(NSApplication.hideOtherApplications(_:)), "h", [.command, .option]),
             item("Mostra tutte", #selector(NSApplication.unhideAllApplications(_:))),
             .separator(),
-            item("Esci da Inventario", #selector(NSApplication.terminate(_:)), "q"),
+            item("Esci da Disk Inventory S", #selector(NSApplication.terminate(_:)), "q"),
         ])
         menu("Archivio", [
             item("Leggi una cartella…", #selector(openFolder(_:)), "o"),
@@ -195,7 +195,7 @@ struct StartView: View {
             }
             .listStyle(.inset)
             HStack {
-                Text("Si può anche trascinare una cartella sull'icona di Inventario.")
+                Text("Si può anche trascinare una cartella sull'icona di Disk Inventory S.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Spacer()

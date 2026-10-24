@@ -1,10 +1,15 @@
-# Inventario
+# Disk Inventory S
 
 Che cosa occupa il disco: una mappa a cuscino di ogni file, grande quanto il posto che occupa.
 È Disk Inventory X di Tjark Derlien (gitlab.com/tderlien/disk-inventory-x) riscritto in Swift
-per i Mac di oggi: nativo per Apple Silicon, e molto più veloce.
+per i Mac di oggi: nativo per Apple Silicon, e molto più veloce. La S sta per Swift.
 
-| | Disk Inventory X (un filo, NSURL) | Inventario | `du -sk` |
+È una versione modificata, non quella dell'autore: riscritta da Riccardo Di Paola nel 2026 (la
+GPL chiede di dirlo). La disposizione e il disegno della mappa vengono da TMVItem.m e
+TMVCushionRenderer.m dell'originale; scansione, modello e interfaccia sono nuovi. Il codice
+interno si chiama ancora `Inventario`, il nome di lavoro.
+
+| | Disk Inventory X (un filo, NSURL) | Disk Inventory S | `du -sk` |
 |---|---|---|---|
 | /Applications, 600 000 file | 158 s | 3,9 s | 21 s |
 | cartella Inizio, 1,2 milioni di file | 723 s | 15,5 s | 103 s |
@@ -46,7 +51,7 @@ Scegliere un tipo di file nell'elenco in basso lo mette in evidenza nella mappa.
 
 Bastano gli strumenti da riga di comando (Swift 6), non serve Xcode.
 
-    tools/inventario-app.sh             # .build/Inventario.app
+    tools/inventario-app.sh             # .build/Disk Inventory S.app
     tools/inventario-app.sh --installa  # anche in /Applications
     swift run -c release inventario-prove
     swift run -c release inventario-cli scan ~      # i tempi della scansione
@@ -54,7 +59,7 @@ Bastano gli strumenti da riga di comando (Swift 6), non serve Xcode.
 `INVENTARIO_MISURA=1` stampa i tempi di scansione e disegno; `INVENTARIO_FOTO=file.png` salva
 un'immagine della finestra dopo la scansione ed esce.
 
-Per leggere anche Mail, Messaggi, Safari e le altre cartelle protette, Inventario ha bisogno
+Per leggere anche Mail, Messaggi, Safari e le altre cartelle protette, Disk Inventory S ha bisogno
 dell'Accesso completo al disco (Impostazioni di Sistema › Privacy e sicurezza).
 
 ## Licenza
