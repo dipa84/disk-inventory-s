@@ -158,6 +158,8 @@ private struct MapPane: View {
     @AppStorage(Prefs.Key.cushionHeight) private var height = 0.5
     @AppStorage(Prefs.Key.ambientLight) private var ambient = 0.15
     @AppStorage(Prefs.Key.hoverFrame) private var hover = true
+    @AppStorage(Prefs.Key.spotlight) private var spotlight = true
+    @AppStorage(Prefs.Key.colorTone) private var tone = Palette.Tone.original.rawValue
     @AppStorage(Prefs.Key.coloredKinds) private var colored = 12
     @AppStorage(Prefs.Key.edges) private var edges = false
 
@@ -177,8 +179,14 @@ private struct MapPane: View {
             } maximumValueLabel: {
                 Text(L("light")).font(.caption)
             }
+            Picker(L("Colors"), selection: $tone) {
+                Text(L("Like the original")).tag(Palette.Tone.original.rawValue)
+                Text(L("Vivid")).tag(Palette.Tone.vivid.rawValue)
+                Text(L("Soft pastel")).tag(Palette.Tone.pastel.rawValue)
+            }
             Toggle(L("A dark line between files"), isOn: $edges)
             Toggle(L("A frame on the file under the pointer"), isOn: $hover)
+            Toggle(L("Spotlight on the folder under the pointer (hold ⌘ for the one above)"), isOn: $spotlight)
             Picker(L("Colored kinds"), selection: $colored) {
                 Text(L("The 12 largest (like the original)")).tag(12)
                 Text(L("The 24 largest")).tag(24)
@@ -191,6 +199,8 @@ private struct MapPane: View {
                     ambient = 0.15
                     edges = false
                     hover = true
+                    spotlight = true
+                    tone = Palette.Tone.original.rawValue
                     colored = 12
                 }
             }
@@ -199,6 +209,8 @@ private struct MapPane: View {
         .onChange(of: ambient) { _, _ in notify() }
         .onChange(of: edges) { _, _ in notify() }
         .onChange(of: hover) { _, _ in notify() }
+        .onChange(of: spotlight) { _, _ in notify() }
+        .onChange(of: tone) { _, _ in notify() }
         .onChange(of: colored) { _, _ in notify() }
     }
 }

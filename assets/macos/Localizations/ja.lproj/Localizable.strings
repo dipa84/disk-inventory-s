@@ -80,8 +80,13 @@
 "Light in the shadows" = "影の明るさ";
 "dark" = "暗い";
 "light" = "明るい";
+"Colors" = "色";
+"Like the original" = "オリジナルと同じ";
+"Vivid" = "鮮やか";
+"Soft pastel" = "淡いパステル";
 "A dark line between files" = "ファイルの間に暗い線";
 "A frame on the file under the pointer" = "ポインタの下のファイルに枠";
+"Spotlight on the folder under the pointer (hold ⌘ for the one above)" = "ポインタの下のフォルダを強調（⌘ を押すと1つ上）";
 "Colored kinds" = "色付きの種類";
 "The 12 largest (like the original)" = "大きい順に12種類（オリジナルと同じ）";
 "The 24 largest" = "大きい順に24種類";

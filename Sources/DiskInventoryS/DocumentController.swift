@@ -134,6 +134,10 @@ final class DocumentController: NSWindowController, NSWindowDelegate, NSToolbarD
     }
 
     private func snapshot(to path: String) {
+        // DIS_HOVER=x,y (fractions of the map), DIS_HOVER_COMMAND=1: the pointer there, ⌘ held
+        if let h = ProcessInfo.processInfo.environment["DIS_HOVER"]?.split(separator: ",").compactMap({ Double($0) }), h.count == 2 {
+            treemap.simulateHover(atFraction: h[0], h[1], command: ProcessInfo.processInfo.environment["DIS_HOVER_COMMAND"] != nil)
+        }
         window?.displayIfNeeded()
         // DIS_PHOTO_CONTENT=1: only the window's content, without title bar and toolbar
         let contentOnly = ProcessInfo.processInfo.environment["DIS_PHOTO_CONTENT"] != nil

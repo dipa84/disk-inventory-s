@@ -119,7 +119,7 @@ final class Document {
     var mode: SizeMode { tree.sizeMode }
 
     func tally() {
-        kinds.tally(tree.root, mode: mode, openPackages: openPackages, colored: Prefs.coloredKinds)
+        kinds.tally(tree.root, mode: mode, openPackages: openPackages, colored: Prefs.coloredKinds, tone: Prefs.colorTone)
     }
 
     func name(_ item: Item) -> String {

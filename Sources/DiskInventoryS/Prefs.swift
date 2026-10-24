@@ -26,6 +26,8 @@ enum Prefs {
             Key.cushionHeight: 0.5,
             Key.ambientLight: 0.15,
             Key.hoverFrame: true,
+            Key.spotlight: true,
+            Key.colorTone: Palette.Tone.original.rawValue,
             Key.coloredKinds: 12,
             Key.edges: false,
             Key.countSharedOnce: true,
@@ -46,6 +48,8 @@ enum Prefs {
         static let cushionHeight = "cushionHeight"
         static let ambientLight = "ambientLight"
         static let hoverFrame = "hoverFrame"
+        static let spotlight = "spotlight"
+        static let colorTone = "colorTone"
         static let coloredKinds = "coloredKinds"
         static let edges = "edges"
         static let countSharedOnce = "countSharedOnce"
@@ -72,6 +76,8 @@ enum Prefs {
     static var cushionHeight: Double { d.double(forKey: Key.cushionHeight) }
     static var ambientLight: Double { d.double(forKey: Key.ambientLight) }
     static var hoverFrame: Bool { d.bool(forKey: Key.hoverFrame) }
+    static var spotlight: Bool { d.bool(forKey: Key.spotlight) }
+    static var colorTone: Palette.Tone { Palette.Tone(rawValue: d.string(forKey: Key.colorTone) ?? "") ?? .original }
     static var coloredKinds: Int { d.integer(forKey: Key.coloredKinds) }
     static var edges: Bool { d.bool(forKey: Key.edges) }
 

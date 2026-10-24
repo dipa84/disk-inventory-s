@@ -46,6 +46,20 @@ public struct CushionStyle: Sendable {
         self.ambient = ambient
         self.edges = edges
     }
+
+    /// How flat the map is, from 0 (the original's relief or more) to 1 (no relief at all).
+    /// Without relief the cushions no longer show where folders end, so the flatter the map,
+    /// the more its folder and file borders are drawn.
+    var flatness: Double { max(0, min(1, 1 - height / 0.4)) }
+
+    /// The original's brightness puts every cushion's top close to white (its sheen). A flat
+    /// tile is all top, so the sheen fades out with the relief and flat colors stay full.
+    var brightnessScale: Double {
+        let len = (1.0 + 1.0 + 100.0).squareRoot()
+        let flatTop = (1 - ambient) * 10 / len + ambient
+        let f = min(1, height / 0.5)
+        return 2.5 / Palette.baseBrightness * f + 1 / flatTop * (1 - f)
+    }
 }
 
 public final class Treemap {
@@ -53,6 +67,8 @@ public final class Treemap {
     public let width: Int, height: Int
     /// the leaves to draw: tile index and cushion surface
     private var leaves: [(cell: Int32, surface: SIMD4<Double>)] = []
+    /// the folders divided into tiles, for their borders
+    private var folders: [Int32] = []
 
     /// - Parameters:
     ///   - isLeaf: whether an entry is drawn whole (files, closed packages, empty folders)
@@ -88,6 +104,7 @@ public final class Treemap {
         }
         let first = cells.count
         let n = f.entries.count
+        if index > 0 { folders.append(Int32(index)) }
         cells[index].firstChild = Int32(first)
         cells[index].childCount = Int32(n)
         for i in 0 ..< n {
@@ -211,8 +228,34 @@ public final class Treemap {
                         if top >= bottom { continue }
                         Self.shade(pixels, width, c, top, bottom, leaf.surface, colors[i], style)
                     }
+                    // folder borders: each folder darkens its top row and left column, so nested
+                    // folders sharing an edge add up and the larger boundaries come out darker
+                    let flat = style.flatness
+                    guard flat > 0 else { return }
+                    let keep = 1 - 0.38 * flat
+                    for k in folders {
+                        let c = cells[Int(k)]
+                        guard c.width >= 3, c.height >= 3 else { continue }
+                        if Int(c.y0) >= y0 && Int(c.y0) < y1 {
+                            Self.darken(pixels + Int(c.y0) * width, Int(c.x0), Int(c.x1), keep)
+                        }
+                        let top = max(Int(c.y0), y0), bottom = min(Int(c.y1), y1)
+                        if top < bottom {
+                            for y in top ..< bottom { Self.darken(pixels + y * width, Int(c.x0), Int(c.x0) + 1, keep) }
+                        }
+                    }
                 }
             }
+        }
+    }
+
+    @inline(__always)
+    private static func darken(_ row: UnsafeMutablePointer<UInt32>, _ from: Int, _ to: Int, _ keep: Double) {
+        let k = UInt32(keep * 256)
+        for x in from ..< to {
+            let p = row[x]
+            let r = (p & 0xFF) * k >> 8, g = (p >> 8 & 0xFF) * k >> 8, b = (p >> 16 & 0xFF) * k >> 8
+            row[x] = r | g << 8 | b << 16 | 0xFF00_0000
         }
     }
 
@@ -220,13 +263,15 @@ public final class Treemap {
     private static func shade(_ pixels: UnsafeMutablePointer<UInt32>, _ width: Int, _ c: Cell, _ top: Int, _ bottom: Int,
                               _ s: SIMD4<Double>, _ color: SIMD3<Double>, _ style: CushionStyle) {
         let ia = style.ambient
-        // the edge: the first row and column of each file, if it is at least 3 pixels wide
-        let edgeX = style.edges && c.width >= 3 ? Int(c.x0) : -1
-        let edgeY = style.edges && c.height >= 3 ? Int(c.y0) : -1
+        // the edge: the first row and column of each file, if it is at least 3 pixels wide; drawn
+        // when asked, and more and more as the map gets flat
+        let edge = style.edges ? 0.45 : 1 - 0.3 * style.flatness
+        let edgeX = edge < 1 && c.width >= 3 ? Int(c.x0) : -1
+        let edgeY = edge < 1 && c.height >= 3 ? Int(c.y0) : -1
         let isl = 1 - ia
         let len = (1.0 + 1.0 + 100.0).squareRoot()
         let lx = -1 / len, ly = -1 / len, lz = 10 / len
-        let scale = 2.5 / Palette.baseBrightness
+        let scale = style.brightnessScale
         for iy in top ..< bottom {
             let ny = -(2 * s[1] * (Double(iy) + 0.5) + s[3])
             let row = pixels + iy * width
@@ -236,7 +281,7 @@ public final class Treemap {
                 var b = isl * cosa
                 b = b < 0 ? ia : b + ia
                 b *= scale
-                if ix == edgeX || iy == edgeY { b *= 0.45 }
+                if ix == edgeX || iy == edgeY { b *= edge }
                 let rgb = Palette.clamp(color * b)
                 row[ix] = UInt32(rgb.x * 255) | UInt32(rgb.y * 255) << 8 | UInt32(rgb.z * 255) << 16 | 0xFF00_0000
             }
@@ -291,20 +336,40 @@ public enum Palette {
     public static let base: [SIMD3<Double>] = [
         [0, 0, 1], [1, 0, 0], [0, 1, 0], [0, 1, 1], [1, 0, 1], [1, 1, 0],
         [0.58, 0.58, 1], [1, 0.58, 0.58], [0.58, 1, 0.58], [0.58, 1, 1], [1, 0.58, 1], [1, 1, 0.58],
-    ].map(normalize)
+    ].map { normalize($0) }
 
-    /// `n` colors: the original twelve, then further hues halfway between them
-    public static func colors(_ n: Int) -> [SIMD3<Double>] {
-        var result = Array(base.prefix(n))
+    /// How the kinds' colors look.
+    public enum Tone: String, CaseIterable, Sendable {
+        /// Disk Inventory X's: all colors at the same brightness
+        case original
+        /// deeper and more saturated
+        case vivid
+        /// soft, close to white
+        case pastel
+    }
+
+    /// `n` colors: the original twelve, then further hues halfway between them, in a tone
+    public static func colors(_ n: Int, tone: Tone = .original) -> [SIMD3<Double>] {
+        let raw: [SIMD3<Double>] = [
+            [0, 0, 1], [1, 0, 0], [0, 1, 0], [0, 1, 1], [1, 0, 1], [1, 1, 0],
+            [0.58, 0.58, 1], [1, 0.58, 0.58], [0.58, 1, 0.58], [0.58, 1, 1], [1, 0.58, 1], [1, 1, 0.58],
+        ]
+        var result = Array(raw.prefix(n))
         var i = 0
         while result.count < n {
-            // in-between hues, at two saturations, normalized like the others
+            // in-between hues, at two saturations
             let hue = (Double(i % 12) + 0.5) / 12
             let sat = i < 12 ? 1.0 : 0.5
-            result.append(normalize(hsv(hue, sat)))
+            result.append(hsv(hue, sat))
             i += 1
         }
-        return result
+        return result.map { c in
+            switch tone {
+            case .original: normalize(c)
+            case .vivid: normalize(c, brightness: 1.4)
+            case .pastel: normalize(c * 0.5 + SIMD3(repeating: 0.5), brightness: 2.2)
+            }
+        }
     }
 
     private static func hsv(_ h: Double, _ s: Double) -> SIMD3<Double> {
@@ -318,9 +383,9 @@ public enum Palette {
     /// the color of the kinds beyond the colored ones
     public static let other = normalize([0.5, 0.5, 0.5])
 
-    public static func normalize(_ c: SIMD3<Double>) -> SIMD3<Double> {
+    public static func normalize(_ c: SIMD3<Double>, brightness: Double = baseBrightness) -> SIMD3<Double> {
         let sum = c.x + c.y + c.z
-        return clamp(sum != 0 ? c * (baseBrightness / sum) : c)
+        return clamp(sum != 0 ? c * (brightness / sum) : c)
     }
 
     /// spreads to the other two components what one has above 1

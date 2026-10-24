@@ -80,8 +80,13 @@
 "Light in the shadows" = "Luce nelle ombre";
 "dark" = "scure";
 "light" = "chiare";
+"Colors" = "Colori";
+"Like the original" = "Come l'originale";
+"Vivid" = "Accesi";
+"Soft pastel" = "Pastello tenui";
 "A dark line between files" = "Una riga scura fra un file e l'altro";
 "A frame on the file under the pointer" = "Un bordo sul file sotto il puntatore";
+"Spotlight on the folder under the pointer (hold ⌘ for the one above)" = "Riflettore sulla cartella sotto il puntatore (con ⌘ quella sopra)";
 "Colored kinds" = "Tipi colorati";
 "The 12 largest (like the original)" = "I 12 più grandi (come l'originale)";
 "The 24 largest" = "I 24 più grandi";

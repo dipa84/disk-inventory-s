@@ -19,7 +19,12 @@ final class TreemapView: NSView {
     weak var controller: DocumentController?
     private var map: Treemap?
     private var image: CGImage?
-    private var hovered: Int?
+    /// the tiles under the pointer, from the root of the map down to the file
+    private var hoveredPath: [Int] = []
+    private var hovered: Int? { hoveredPath.last }
+    /// ⌘ held: the spotlight goes one level up
+    private var commandHeld = false
+    private var flagsMonitor: Any?
     /// timings in the terminal (DIS_TIMING=1)
     private let measure = ProcessInfo.processInfo.environment["DIS_TIMING"] != nil
 
@@ -36,13 +41,30 @@ final class TreemapView: NSView {
 
     required init?(coder: NSCoder) { fatalError() }
 
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        if let flagsMonitor { NSEvent.removeMonitor(flagsMonitor) }
+        flagsMonitor = nil
+        guard window != nil else { return }
+        // ⌘ changes the spotlight even when the map is not first responder
+        flagsMonitor = NSEvent.addLocalMonitorForEvents(matching: .flagsChanged) { [weak self] event in
+            guard let self, event.window === self.window else { return event }
+            let held = event.modifierFlags.contains(.command)
+            if held != self.commandHeld {
+                self.commandHeld = held
+                if !self.hoveredPath.isEmpty { self.needsDisplay = true }
+            }
+            return event
+        }
+    }
+
     private var scale: CGFloat { window?.backingScaleFactor ?? 2 }
 
     /// to redo: the layout (size, zoom or tree changed)
     func reload() {
         map = nil
         image = nil
-        hovered = nil
+        hoveredPath = []
         needsDisplay = true
     }
 
@@ -113,6 +135,19 @@ final class TreemapView: NSView {
         ctx.draw(image, in: bounds)
         ctx.restoreGState()
 
+        if let k = spotlight, let r = rect(of: k) {
+            // everything outside the folder goes dark; the folder keeps its light, a frame and its name
+            let shade = NSBezierPath(rect: bounds)
+            shade.append(NSBezierPath(rect: r))
+            shade.windingRule = .evenOdd
+            NSColor.black.withAlphaComponent(0.55).setFill()
+            shade.fill()
+            NSColor.white.withAlphaComponent(0.9).setStroke()
+            let frame = NSBezierPath(rect: r.insetBy(dx: 0.75, dy: 0.75))
+            frame.lineWidth = 1.5
+            frame.stroke()
+            drawLabel(of: k, around: r)
+        }
         if Prefs.hoverFrame, let h = hovered, let r = rect(of: h) {
             NSColor.white.withAlphaComponent(0.5).setStroke()
             let p = NSBezierPath(rect: r.insetBy(dx: 0.5, dy: 0.5))
@@ -130,6 +165,47 @@ final class TreemapView: NSView {
             inner.lineWidth = 1.5
             inner.stroke()
         }
+    }
+
+    /// for testing (DIS_HOVER=x,y as fractions of the map): as if the pointer were there
+    func simulateHover(atFraction x: CGFloat, _ y: CGFloat, command: Bool) {
+        hoveredPath = path(at: NSPoint(x: bounds.width * x, y: bounds.height * y))
+        commandHeld = command
+        needsDisplay = true
+        controller?.hover(hoveredPath.last.flatMap { item(of: $0) })
+    }
+
+    // MARK: the spotlight
+
+    /// The folder holding the file under the pointer (with ⌘ the one above), unless it is the
+    /// whole map.
+    private var spotlight: Int? {
+        guard Prefs.spotlight, hoveredPath.count >= 2 else { return nil }
+        let level = hoveredPath.count - 2 - (commandHeld ? 1 : 0)
+        return level >= 1 ? hoveredPath[level] : nil
+    }
+
+    /// The folder's name and size, in its top left corner, or just outside if it does not fit.
+    private func drawLabel(of cell: Int, around r: NSRect) {
+        guard let doc = controller?.model, let item = item(of: cell) else { return }
+        let text = doc.name(item) + "  ·  " + Format.size(item.size(doc.mode))
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: NSFont.systemFont(ofSize: 11, weight: .semibold),
+            .foregroundColor: NSColor.white,
+        ]
+        let size = (text as NSString).size(withAttributes: attributes)
+        let pad = NSSize(width: 6, height: 3)
+        var box = NSRect(x: r.minX + 4, y: r.minY + 4, width: size.width + 2 * pad.width, height: size.height + 2 * pad.height)
+        if box.maxX > r.maxX - 4 || box.maxY > r.maxY - 4 {
+            // too small: above the folder, or below if there is no room above
+            box.origin.y = r.minY - box.height - 3 >= bounds.minY ? r.minY - box.height - 3 : r.maxY + 3
+            box.origin.x = r.minX
+        }
+        box.origin.x = min(max(box.minX, bounds.minX + 2), bounds.maxX - box.width - 2)
+        box.origin.y = min(max(box.minY, bounds.minY + 2), bounds.maxY - box.height - 2)
+        NSColor.black.withAlphaComponent(0.78).setFill()
+        NSBezierPath(roundedRect: box, xRadius: 4, yRadius: 4).fill()
+        (text as NSString).draw(at: NSPoint(x: box.minX + pad.width, y: box.minY + pad.height), withAttributes: attributes)
     }
 
     // MARK: tiles and entries
@@ -194,15 +270,16 @@ final class TreemapView: NSView {
         // a photo for the README must not show where the pointer happens to be
         if ProcessInfo.processInfo.environment["DIS_PHOTO"] != nil { return }
         let p = convert(event.locationInWindow, from: nil)
-        let h = path(at: p).last
-        guard h != hovered else { return }
-        hovered = h
+        let path = path(at: p)
+        commandHeld = event.modifierFlags.contains(.command)
+        guard path != hoveredPath else { return }
+        hoveredPath = path
         needsDisplay = true
-        controller?.hover(h.flatMap { item(of: $0) })
+        controller?.hover(path.last.flatMap { item(of: $0) })
     }
 
     override func mouseExited(with event: NSEvent) {
-        hovered = nil
+        hoveredPath = []
         needsDisplay = true
         controller?.hover(nil)
     }

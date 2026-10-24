@@ -80,8 +80,13 @@
 "Light in the shadows" = "阴影亮度";
 "dark" = "暗";
 "light" = "亮";
+"Colors" = "颜色";
+"Like the original" = "与原版相同";
+"Vivid" = "鲜艳";
+"Soft pastel" = "柔和粉彩";
 "A dark line between files" = "文件之间显示深色分隔线";
 "A frame on the file under the pointer" = "为指针下的文件加边框";
+"Spotlight on the folder under the pointer (hold ⌘ for the one above)" = "聚光指针下的文件夹（按住 ⌘ 显示上一级）";
 "Colored kinds" = "彩色种类";
 "The 12 largest (like the original)" = "最大的 12 种（与原版相同）";
 "The 24 largest" = "最大的 24 种";

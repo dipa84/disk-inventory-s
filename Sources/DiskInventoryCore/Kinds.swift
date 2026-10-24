@@ -88,7 +88,7 @@ public final class Kinds {
 
     /// Adds up how much each kind takes under `folder` and gives colors to the largest kinds.
     /// Closed packages count as a single item of their kind.
-    public func tally(_ folder: Folder, mode: SizeMode, openPackages: Bool, colored: Int = 12) {
+    public func tally(_ folder: Folder, mode: SizeMode, openPackages: Bool, colored: Int = 12, tone: Palette.Tone = .original) {
         for i in kinds.indices {
             kinds[i].alloc = 0
             kinds[i].logical = 0
@@ -111,7 +111,7 @@ public final class Kinds {
         // colors for the real kinds; free space light, the rest dark
         let spaces = Set(spaceKinds.values.map(Int.init))
         let order = kinds.indices.filter { !spaces.contains($0) }.sorted { kinds[$0].size(mode) > kinds[$1].size(mode) }
-        let palette = Palette.colors(colored)
+        let palette = Palette.colors(colored, tone: tone)
         for (rank, k) in order.enumerated() {
             kinds[k].color = rank < palette.count && kinds[k].count > 0 ? palette[rank] : Palette.other
         }
