@@ -1,3 +1,12 @@
+// Disk Inventory S — what is taking up the disk, as a cushion treemap.
+// Copyright (C) 2026 Riccardo Di Paola
+//
+// This program is free software: you can redistribute it and/or modify it under the terms of the
+// GNU General Public License as published by the Free Software Foundation, either version 3 of the
+// License, or (at your option) any later version. It is distributed WITHOUT ANY WARRANTY; see the
+// GNU General Public License in COPYING for details.
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import CoreGraphics
 import Foundation
 import ImageIO
@@ -9,8 +18,8 @@ import DiskInventoryCore
 //        dis-cli unreadable <folder>                the folders that cannot be read
 //        dis-cli map <folder> <file.png> [WxH]      the treemap as an image, with timings
 //        dis-cli icon <folder.iconset>              the app icon: a small cushion treemap
-//        dis-cli export <list> <output>             reads the folders in the list (one per line)
-//                                                   and writes them for the app: the helper the
+//        dis-cli export <folder>…                   reads the folders and prints them for the app
+//                                                   (FolderExport, LZFSE, base64): the helper the
 //                                                   app runs with the administrator password
 
 func seconds(_ start: ContinuousClock.Instant) -> String {
@@ -63,20 +72,15 @@ case "unreadable":
         stack.append(contentsOf: f.subfolders)
     }
 case "export":
-    guard args.count >= 4, let list = try? String(contentsOfFile: args[2], encoding: .utf8) else { exit(2) }
+    // Running as root, so it writes no files: the result goes to standard output, which the app
+    // reads. A file in the user's temporary folder could be swapped for a link by another program
+    // and make root overwrite something else.
     var folders: [(path: String, folder: Folder)] = []
-    for p in list.split(separator: "\n").map(String.init) where !p.isEmpty {
+    for p in args.dropFirst(2) {
         if let tree = DiskScanner().scan(p) { folders.append((p, tree.root)) }
     }
-    let out = URL(fileURLWithPath: args[3])
-    do {
-        try FolderExport.write(folders).write(to: out)
-        // whoever asked must be able to read it (here we are the administrator)
-        chmod(args[3], 0o644)
-    } catch {
-        print("cannot write \(args[3]): \(error)")
-        exit(1)
-    }
+    guard let packed = try? (FolderExport.write(folders) as NSData).compressed(using: .lzfse) else { exit(1) }
+    print((packed as Data).base64EncodedString())
 case "original":
     // the same keys FSItem.m asks for, with NSDirectoryEnumerator, one thread
     let start = ContinuousClock.now

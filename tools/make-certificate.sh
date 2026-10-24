@@ -1,4 +1,5 @@
 #!/bin/zsh
+# Copyright (C) 2026 Riccardo Di Paola. SPDX-License-Identifier: GPL-3.0-or-later
 # Creates, once per Mac, a self-signed code signing certificate in the login keychain, so that
 # tools/build-app.sh can sign every build with the same identity and macOS keeps the privacy
 # permissions (Full Disk Access, Desktop, Documents…) from one build to the next.

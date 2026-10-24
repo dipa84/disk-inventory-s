@@ -1,3 +1,12 @@
+// Disk Inventory S — what is taking up the disk, as a cushion treemap.
+// Copyright (C) 2026 Riccardo Di Paola
+//
+// This program is free software: you can redistribute it and/or modify it under the terms of the
+// GNU General Public License as published by the Free Software Foundation, either version 3 of the
+// License, or (at your option) any later version. It is distributed WITHOUT ANY WARRANTY; see the
+// GNU General Public License in COPYING for details.
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import AppKit
 import DiskInventoryCore
 import Quartz
@@ -264,13 +273,10 @@ final class DocumentController: NSWindowController, NSWindowDelegate, NSToolbarD
         let tree = doc.tree
         let folders = doc.unreadFolders
         let paths = folders.map { tree.path(of: $0) }
-        let dir = FileManager.default.temporaryDirectory
-        let list = dir.appendingPathComponent("disk-inventory-s-\(getpid())-list.txt")
-        let out = dir.appendingPathComponent("disk-inventory-s-\(getpid())-folders.bin")
-        try? FileManager.default.removeItem(at: out)
-        guard (try? (paths.joined(separator: "\n") + "\n").write(to: list, atomically: true, encoding: .utf8)) != nil else { return }
         func quoted(_ s: String) -> String { "'" + s.replacingOccurrences(of: "'", with: "'\\''") + "'" }
-        let shell = [helper, "export", list.path, out.path].map(quoted).joined(separator: " ")
+        // the folders go as arguments and the result comes back on standard output: no files
+        // that another program could tamper with while the helper runs as root
+        let shell = ([helper, "export"] + paths).map(quoted).joined(separator: " ")
         func literal(_ s: String) -> String { "\"" + s.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"") + "\"" }
         let prompt = L("Disk Inventory S wants to read the system folders an app can’t open. It only reads them, without changing anything.")
         let script = "do shell script \(literal(shell)) with administrator privileges with prompt \(literal(prompt))"
@@ -283,17 +289,20 @@ final class DocumentController: NSWindowController, NSWindowDelegate, NSToolbarD
             let p = Process()
             p.executableURL = URL(fileURLWithPath: withoutPassword ? "/bin/sh" : "/usr/bin/osascript")
             p.arguments = withoutPassword ? ["-c", shell] : ["-e", script]
-            p.standardOutput = FileHandle.nullDevice
+            let pipe = Pipe()
+            p.standardOutput = pipe
             p.standardError = FileHandle.nullDevice
+            var output = Data()
             var ok = false
             if (try? p.run()) != nil {
+                // read before waiting: the output can be larger than the pipe's buffer
+                output = pipe.fileHandleForReading.readDataToEndOfFile()
                 p.waitUntilExit()
                 ok = p.terminationStatus == 0
             }
-            let data = ok ? try? Data(contentsOf: out) : nil
+            let text = String(decoding: output, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
+            let data = ok ? Data(base64Encoded: text).flatMap { try? ($0 as NSData).decompressed(using: .lzfse) as Data } : nil
             let read = data.flatMap { FolderExport.read($0, registry: tree.extensions, mode: mode) }
-            try? FileManager.default.removeItem(at: list)
-            try? FileManager.default.removeItem(at: out)
             DispatchQueue.main.async {
                 guard let self else { return }
                 self.readingAsAdmin = false

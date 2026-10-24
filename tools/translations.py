@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Copyright (C) 2026 Riccardo Di Paola. SPDX-License-Identifier: GPL-3.0-or-later
 """The interface translations: a single table, from English to the other six languages.
 
 Writes assets/macos/Localizations/<language>.lproj/Localizable.strings (and InfoPlist.strings) and

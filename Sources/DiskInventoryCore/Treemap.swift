@@ -1,3 +1,14 @@
+// Disk Inventory S — what is taking up the disk, as a cushion treemap.
+// Copyright (C) 2026 Riccardo Di Paola
+// Based on Disk Inventory X (TMVItem.m, TMVCushionRenderer.m, FileTypeColors.m),
+// Copyright (C) 2003-2022 Tjark Derlien, GPL-3.0-or-later.
+//
+// This program is free software: you can redistribute it and/or modify it under the terms of the
+// GNU General Public License as published by the Free Software Foundation, either version 3 of the
+// License, or (at your option) any later version. It is distributed WITHOUT ANY WARRANTY; see the
+// GNU General Public License in COPYING for details.
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import Foundation
 
 /// A tile of the map: an entry of a folder (file or folder) and where it is, in pixels.

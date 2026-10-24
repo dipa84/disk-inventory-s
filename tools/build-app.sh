@@ -1,4 +1,5 @@
 #!/bin/zsh
+# Copyright (C) 2026 Riccardo Di Paola. SPDX-License-Identifier: GPL-3.0-or-later
 # Builds Disk Inventory S.app: the window, the helper for system folders, the icon and the
 # translations.
 #
@@ -14,16 +15,20 @@ set -e
 cd "${0:A:h}/.."
 # translations: stops if a string is not translated
 python3 -I tools/translations.py
-swift build -c release --product DiskInventoryS
-# the helper for system folders (the app runs it with the administrator password)
-swift build -c release --product dis-cli
+# universal: Apple Silicon and Intel, built separately and joined with lipo
+for arch in arm64 x86_64; do
+  swift build -c release --triple $arch-apple-macosx15.0 --product DiskInventoryS
+  # the helper for system folders (the app runs it with the administrator password)
+  swift build -c release --triple $arch-apple-macosx15.0 --product dis-cli
+done
 version=$(cat VERSION)
 name="Disk Inventory S"
 app=".build/$name.app"
 rm -rf "$app"
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
-cp .build/release/DiskInventoryS "$app/Contents/MacOS/"
-cp .build/release/dis-cli "$app/Contents/MacOS/"
+for bin in DiskInventoryS dis-cli; do
+  lipo -create -output "$app/Contents/MacOS/$bin" .build/{arm64,x86_64}-apple-macosx/release/$bin
+done
 cp assets/macos/DiskInventoryS.icns "$app/Contents/Resources/"
 cp -R assets/macos/Localizations/*.lproj "$app/Contents/Resources/"
 sed "s/@VERSION@/$version/g" assets/macos/Info.plist > "$app/Contents/Info.plist"
